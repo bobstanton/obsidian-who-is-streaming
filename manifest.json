@@ -1,6 +1,6 @@
 {
 	"id": "who-is-streaming",
-	"name": "Who Is Streaming Plugin",
+	"name": "Who Is Streaming",
 	"version": "1.0.0",
 	"minAppVersion": "0.15.0",
 	"description": "Looks up which streaming services a movie or TV show is available on.",
