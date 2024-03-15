@@ -1,0 +1,22 @@
+.suggestion-item .show-title,
+.suggestion-item .show-icon {
+    display: flex;
+    align-items: center;
+    font-weight: var(--font-normal);
+}
+
+.suggestion-item .show-icon {
+    margin-right: 4px;
+}
+
+.suggestion-item .show-overview {
+    font-weight: var(--font-light);
+    margin-bottom: 4px;
+}
+
+.setting-item.who-is-streaming-textarea .setting-item-control {
+    min-width: 40%;
+}
+.setting-item.who-is-streaming-textarea .setting-item-control textarea{
+    width: 100%;
+}

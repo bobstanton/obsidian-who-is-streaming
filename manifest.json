@@ -1,0 +1,11 @@
+{
+	"id": "who-is-streaming",
+	"name": "Who Is Streaming Plugin",
+	"version": "1.0.0",
+	"minAppVersion": "0.15.0",
+	"description": "Looks up which streaming services a movie or TV show is available on.",
+	"author": "Bob Stanton",
+	"authorUrl": "https://github.com/bobstanton",
+	"fundingUrl": "",
+	"isDesktopOnly": false
+}
