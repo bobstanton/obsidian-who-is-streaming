@@ -9,5 +9,5 @@ An [API Key](https://rapidapi.com/movie-of-the-night-movie-of-the-night-default/
 
 Then create a new note, enter a movie or TV show as the name of the note, then use the popcorn ribbon button or `Who Is Streaming` command. The title of the note will be used to search the Streaming Availability API. A list of options will be presented to choose from. After syncing a note once, the `tmdb_id` and `Type` properties will be used to sync directly without the need for a search. 
 
-[![demo](demo.webp)](https://github.com/bobstanton/who-is-streaming/demo.mp4)
+[![demo](demo.webp)](https://github.com/bobstanton/obsidian-who-is-streaming/blob/main/demo.mp4)
 
