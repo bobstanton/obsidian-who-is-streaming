@@ -1,7 +1,7 @@
 {
 	"name": "who-is-streaming",
 	"version": "1.0.0",
-	"description": "Looks up which streaming services a movie or TV show is available on.",
+	"description": "Discover and keep track of which streaming services a movie is currently available to be streamed on.",
 	"main": "main.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
@@ -12,19 +12,19 @@
 	"author": "",
 	"license": "MIT",
 	"devDependencies": {
-		"@types/node": "^16.11.6",
-		"@typescript-eslint/eslint-plugin": "5.29.0",
-		"@typescript-eslint/parser": "5.29.0",
-		"builtin-modules": "3.3.0",
-		"esbuild": "0.17.3",
-		"obsidian": "latest",
-		"obsidian-dataview": "^0.5.64",
-		"tslib": "2.4.0",
-		"typescript": "4.7.4"
+		"@types/node": "^24.9.1",
+		"@typescript-eslint/eslint-plugin": "8.46.2",
+		"@typescript-eslint/parser": "8.46.2",
+		"builtin-modules": "5.0.0",
+		"esbuild": "0.25.11",
+		"obsidian": "^1.10.0",
+		"obsidian-dataview": "^0.5.68",
+		"tslib": "2.8.1",
+		"typescript": "5.9.3"
 	},
 	"dependencies": {
 		"he": "^1.2.0",
-		"streaming-availability": "^3.0.1",
-		"ts-pattern": "^5.0.8"
+		"streaming-availability": "^4.4.0",
+		"ts-pattern": "^5.8.0"
 	}
 }
