@@ -11,5 +11,7 @@ Then create a new note, enter a movie or TV show as the name of the note, then u
 
 
 
+
+
 https://github.com/user-attachments/assets/ab89ea54-b529-49e0-aa6a-15a6ee7679ca
 
