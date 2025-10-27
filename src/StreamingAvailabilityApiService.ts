@@ -1,79 +1,88 @@
-import * as streamingAvailability from "streaming-availability";
-import { WhoIsStreamingSettings } from "./main"; // Import the WhoIsStreamingSettings type
+import { Client, Configuration, Show, Country } from "streaming-availability";
+import { WhoIsStreamingSettings } from "./settings";
 import { Notice } from "obsidian";
-
-//This data is returned in raw response, now sure why it isn't included in streamingAvailability.Show
-export interface ShowWithExtraDetails extends streamingAvailability.Show {
-  cast: Array<string>;
-  overview: string;
-}
 
 export default class StreamingAvailabilityApiService {
   settings: WhoIsStreamingSettings;
-  apiClient: streamingAvailability.DefaultApi;
-  apiShowCache: Map<string, ShowWithExtraDetails | undefined>; //cache for single show
-  apiSearchCache: Map<string, Array<ShowWithExtraDetails>>; //cache for searches
+  apiClient: Client;
+  apiShowCache: Map<string, Show | undefined>;
+  apiSearchCache: Map<string, Array<Show>>;
 
   constructor(settings: WhoIsStreamingSettings) {
     this.settings = settings;
 
-    this.apiClient = new streamingAvailability.DefaultApi(
-      new streamingAvailability.Configuration({ apiKey: this.settings.apiKey })
-    ).withMiddleware(new ThrottleMiddleware());
+    this.apiClient = new Client(new Configuration({
+        apiKey: this.settings.apiKey,
+    }));
 
-    this.apiShowCache = new Map<string, ShowWithExtraDetails | undefined>();
-    this.apiSearchCache = new Map<string, Array<ShowWithExtraDetails>>();
+    this.apiShowCache = new Map<string, Show | undefined>();
+    this.apiSearchCache = new Map<string, Array<Show>>();
   }
 
-  async getCountries(): Promise<{ [key: string]: streamingAvailability.Country }> {
-    if (Object.keys(this.settings.countriesCache).length !== 0 && this.getDaysDifference(new Date(this.settings.countriesCacheAsOf), new Date(Date.now())) < 7) {
-      return this.settings.countriesCache;
-    }
-
+  async getCountries(): Promise<{ [key: string]: Country }> {
     if (!this.validateApiKey()) {
       return {};
     }
 
+    if (Object.keys(this.settings.countriesCache).length !== 0 
+      && this.getDaysDifference(new Date(this.settings.countriesCacheAsOf), new Date(Date.now())) < 7) 
+    {
+      return this.settings.countriesCache;
+    }
+
     try {
-      const response = await this.apiClient.countries();
+      const apiResponse = await this.apiClient.countriesApi.getCountriesRaw({
+        outputLanguage: "en",
+      });
 
-      this.settings.countriesCache = response.result;
-      this.settings.countriesCacheAsOf = new Date(Date.now());
+      this.checkRateLimitHeaders(apiResponse.raw);
 
-      return response.result;
-    } catch (error) {
-      if (!this.handleApiError(error)) {
-        console.error(error);
+      const countriesData = await apiResponse.value();
+
+      if (!countriesData || typeof countriesData !== "object") {
+        return {};
       }
 
+      this.settings.countriesCache = countriesData;
+      this.settings.countriesCacheAsOf = new Date(Date.now());
+
+      return countriesData;
+    } catch (error: unknown) {
+      await this.handleApiError(error);
       return {};
     }
   }
 
-  async getShowByTmdbId(showType: string, tmdb_id: number): Promise<ShowWithExtraDetails | undefined> {
+  async getShowByTmdbId(showType: string, tmdb_id: number, showNotice: boolean = true): Promise<Show | undefined> {
     const cacheKey = `getShowByTmdbId:${showType}/${tmdb_id}`;
     const cachedResponse = this.apiShowCache.get(cacheKey);
     if (cachedResponse) return cachedResponse;
-    
+
+    const tmdbIdType = showType === "movie" ? "movie" : "tv";
+
     try {
-      const response = await this.apiClient.getByIdRaw({
-        tmdbId: `${showType === "movie" ? "movie" : "tv"}/${tmdb_id}`,
+      const apiResponse = await this.apiClient.showsApi.getShowRaw({
+        id: `${tmdbIdType}/${tmdb_id}`,
+        country: this.settings.country,
         seriesGranularity: "show",
       });
 
-      const show = (await response.raw.json()).result as ShowWithExtraDetails;
+      this.checkRateLimitHeaders(apiResponse.raw);
+
+      const show = await apiResponse.value();
       this.apiShowCache.set(cacheKey, show);
       return show;
-    } catch (error) {
-      if (!this.handleApiError(error)) {
-        console.error(error);
+    } catch (error: unknown) {
+      if (!showNotice) {
+        throw error;
       }
 
+      await this.handleApiError(error, showNotice);
       return undefined;
     }
   }
 
-  async searchForShowsByTitle(searchTerm: string): Promise<Array<ShowWithExtraDetails>> {
+  async searchForShowsByTitle(searchTerm: string): Promise<Array<Show>> {
     if (!this.validateApiKey()) {
       return [];
     }
@@ -81,50 +90,78 @@ export default class StreamingAvailabilityApiService {
     const cacheKey = `searchForShowsByTitle:${searchTerm}`;
     const cachedResponse = this.apiSearchCache.get(cacheKey);
     if (cachedResponse) return cachedResponse;
-    
+
     try {
-      const response = await this.apiClient.searchByTitleRaw({
+      const apiResponse = await this.apiClient.showsApi.searchShowsByTitleRaw({
         country: this.settings.country,
         title: searchTerm,
       });
-      var results = (await response.raw.json()).result as Array<ShowWithExtraDetails>;
+
+      this.checkRateLimitHeaders(apiResponse.raw);
+
+      const results = await apiResponse.value();
       this.apiSearchCache.set(cacheKey, results);
 
       return results;
-    } catch (error) {
-      if (!this.handleApiError(error)) {
-        console.error(error);
-      }
-
+    } catch (error: unknown) {
+      await this.handleApiError(error);
       return [];
     }
   }
 
-  /**
-   * Handles API errors and displays appropriate error messages.
-   * @param error - The error object.
-   * @returns Returns `true` if the error was handled, `false` otherwise.
-   */
-  handleApiError(error: any): boolean {
+  async handleApiError(error: unknown, showNotice: boolean = true): Promise<string | undefined> {
     if ("response" in error) {
-      //error instanceof streamingAvailability.ResponseError
       if (error.response.status === 429) {
-        new Notice("Number of API requests exceeded. Upgrade your plan or wait for the limit to reset.");
-        return true;
-      } else if (error.response.status !== 200) {
-        console.log(error);
-        console.log(error.response);
-        new Notice("There was an error fetching the show. Check the console for more details.");
-        return true;
+        let message = "API rate limit exceeded.";
+
+        try {
+          if (error.response.body && typeof error.response.clone === 'function') {
+            const clonedResponse = error.response.clone();
+            const data = await clonedResponse.json();
+            if (data?.message) {
+              message = data.message;
+            }
+          }
+        } catch (e: unknown) {
+          // Failed to parse error response - use default message
+        }
+
+        if (showNotice) {
+          new Notice(message, 10000);
+        }
+        return message;
+      } else {
+        let message = "Unable to fetch show information from the streaming API.";
+
+        try {
+          if (error.response.body && typeof error.response.clone === 'function') {
+            const clonedResponse = error.response.clone();
+            const data = await clonedResponse.json();
+            if (data?.message) {
+              message = data.message;
+            }
+          }
+        } catch (e: unknown) {
+          if (error.response.status === 404) {
+            message = "Show not found in the streaming database.";
+          } else if (error.response.status >= 500) {
+            message = "Streaming API server error. Please try again later.";
+          }
+        }
+
+        if (showNotice) {
+          new Notice(message);
+        }
+        return message;
       }
     }
 
-    return false;
+    return undefined;
   }
 
   validateApiKey(): boolean {
     if (this.settings.apiKey?.length !== 50) {
-      new Notice("No API key or API key is in correct format.");
+      new Notice("No API key or API key is in incorrect format");
       return false;
     }
 
@@ -137,47 +174,48 @@ export default class StreamingAvailabilityApiService {
     return daysDifference;
   }
 
-}
-
-class ThrottleMiddleware implements streamingAvailability.Middleware {
-  previousApiCallTime = Date.now();
-
-  async pre(
-    context: streamingAvailability.RequestContext
-  ): Promise<streamingAvailability.FetchParams | void> {
-    const delay = 1000 / 10; // 10 requests per second
-    const timeSinceLastCall = Date.now() - this.previousApiCallTime;
-    if (timeSinceLastCall < delay) {
-      await new Promise((resolve) =>
-        setTimeout(resolve, delay - timeSinceLastCall)
-      );
+  checkRateLimitHeaders(response: Response): void {
+    if (this.settings.rateLimitWarningThreshold === 0) {
+      return; 
     }
-    this.previousApiCallTime = Date.now();
+
+    const headers = response.headers;
+    if (!headers) {
+      return;
+    }
+
+    const limit = headers.get("x-ratelimit-api-request-limit");
+    const remaining = headers.get("x-ratelimit-api-request-remaining");
+    const resetSeconds = headers.get("x-ratelimit-api-request-reset");
+
+    if (!limit || remaining === null) {
+      return;
+    }
+
+    const limitNum = parseInt(limit);
+    const remainingNum = parseInt(remaining);
+    const percentageUsed = ((limitNum - remainingNum) / limitNum) * 100;
+    const percentageRemaining = (remainingNum / limitNum) * 100;
+
+    if (percentageUsed >= this.settings.rateLimitWarningThreshold && remainingNum > 0) {
+      let message = `⚠️ API Rate Limit Warning: ${remainingNum}/${limitNum} requests remaining (${percentageUsed.toFixed(0)}% used)`;
+
+      if (resetSeconds) {
+        const seconds = parseInt(resetSeconds);
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+
+        if (hours > 0) {
+          message += `. Resets in ${hours}h ${minutes}m`;
+        } else if (minutes > 0) {
+          message += `. Resets in ${minutes}m`;
+        } else {
+          message += `. Resets in ${seconds}s`;
+        }
+      }
+
+      message += ".";
+      new Notice(message, 8000);
+    }
   }
 }
-
-/*
-    let cache = new Map<string, any>();    
-    const cacheMiddleware: streamingAvailability.Middleware = {
-      async pre(context: streamingAvailability.RequestContext): Promise<streamingAvailability.FetchParams | void> {
-        console.log("requestContext");
-
-        console.log(context);
-        const cacheKey = context.url;
-        const cachedResponse = cache.get(cacheKey);
-        if (cachedResponse) {
-          console.log("cachedResponse");
-          console.log(cachedResponse);
-          return Promise.resolve(cachedResponse);
-        }
-      },
-      async post(context: streamingAvailability.ResponseContext): Promise<Response | void> {
-        console.log(context);
-        if (context.response.status !== 200 || context.init.method !== 'GET')
-          return;
-
-        const cacheKey = context.url;
-        cache.set(cacheKey, context);
-      },
-    };
-        */
