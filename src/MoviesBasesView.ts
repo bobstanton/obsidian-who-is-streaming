@@ -65,7 +65,7 @@ export class MoviesBasesView extends BasesView {
 
         if (filteredEntries.length === 0) {
             this.containerEl.createDiv({
-                text: "No movies with TMDB Id found.",
+                text: "No movies with TMDB id found.",
                 cls: "who-is-streaming-empty",
             });
             return;

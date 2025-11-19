@@ -160,7 +160,7 @@ export default class WhoIsStreamingPlugin extends Plugin {
         const [tmdb_id, showType] = await this.getTmdbId(file);
 
         if (!tmdb_id || !showType) {
-          progressModal.recordFailure(file.basename, "No TMDB Id found");
+          progressModal.recordFailure(file.basename, "No TMDB id found");
           continue;
         }
 
@@ -187,7 +187,7 @@ export default class WhoIsStreamingPlugin extends Plugin {
       return;
     }
 
-    const findingNotice = new Notice("🔄 Finding files with TMDB Id...", 0);
+    const findingNotice = new Notice("🔄 Finding files with TMDB id...", 0);
 
     const allFiles = this.app.vault.getMarkdownFiles();
     const filesWithTmdbId: TFile[] = [];
@@ -202,7 +202,7 @@ export default class WhoIsStreamingPlugin extends Plugin {
     findingNotice.hide();
 
     if (filesWithTmdbId.length === 0) {
-      new Notice("❌ No files with TMDB Id found");
+      new Notice("❌ No files with TMDB id found");
       return;
     }
 
@@ -223,7 +223,7 @@ export default class WhoIsStreamingPlugin extends Plugin {
         const [tmdb_id, showType] = await this.getTmdbId(file);
 
         if (!tmdb_id || !showType) {
-          progressModal.recordFailure(file.basename, "No TMDB Id found");
+          progressModal.recordFailure(file.basename, "No TMDB id found");
           continue;
         }
 
@@ -283,7 +283,7 @@ export default class WhoIsStreamingPlugin extends Plugin {
       const [tmdb_id, showType] = await this.getTmdbId(activeFile);
 
       if (!tmdb_id || !showType) {
-        new Notice("❌ No TMDB Id found in frontmatter");
+        new Notice("❌ No TMDB id found in frontmatter");
         return;
       }
 

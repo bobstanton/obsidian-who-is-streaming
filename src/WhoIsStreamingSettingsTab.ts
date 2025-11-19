@@ -62,7 +62,7 @@ class JellyfinInstanceModal extends Modal {
       .setDesc("A friendly name for this Jellyfin instance")
       .addText((text) => {
         text
-          .setPlaceholder("My Jellyfin Server")
+          .setPlaceholder("My Jellyfin server")
           .setValue(this.instance.name)
           .onChange((value) => {
             this.instance.name = value;
@@ -83,7 +83,7 @@ class JellyfinInstanceModal extends Modal {
 
     new Setting(contentEl)
       .setName("API key")
-      .setDesc("Jellyfin API key (generate in Dashboard → API Keys)")
+      .setDesc("Jellyfin API key (generate in Dashboard → API keys)")
       .addText((text) => {
         text
           .setPlaceholder("API key")
@@ -254,7 +254,7 @@ export class WhoIsStreamingSettingsTab extends PluginSettingTab {
       .setDesc("Folder path for storing downloaded posters")
       .addText((text) => {
         text
-          .setPlaceholder("posters")
+          .setPlaceholder("Posters")
           .setValue(this.plugin.settings.posterFolder)
           .onChange((value) => {
             void (async () => {
