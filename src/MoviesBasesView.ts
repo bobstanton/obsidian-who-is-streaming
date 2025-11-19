@@ -105,7 +105,10 @@ export class MoviesBasesView extends BasesView {
             titleEl.setText(entry.file.basename);
 
             const yearEl = headerDiv.createSpan({ cls: "movie-card-year" });
-            if (fm["Year"]) yearEl.setText(fm["Year"].toString());
+            if (fm["Year"]) {
+                const year = typeof fm["Year"] === "number" || typeof fm["Year"] === "string" ? String(fm["Year"]) : "";
+                if (year) yearEl.setText(year);
+            }
 
             this.renderMetadata(detailsDiv, entry);
 
@@ -115,9 +118,9 @@ export class MoviesBasesView extends BasesView {
 
             this.renderStreamingBadges(detailsDiv, entry);
 
-            if (fm["Overview"]) {
+            if (fm["Overview"] && typeof fm["Overview"] === "string") {
                 const overviewDiv = detailsDiv.createDiv({ cls: "movie-card-overview" });
-                overviewDiv.setText(fm["Overview"].toString());
+                overviewDiv.setText(fm["Overview"]);
             }
 
             card.addClass("clickable");
@@ -153,8 +156,8 @@ export class MoviesBasesView extends BasesView {
 
             const posterContainer = posterItem.createDiv({ cls: "poster-container" });
 
-            if (fm["Poster"]) {
-                const posterUrl = this.getPosterUrl(fm["Poster"].toString());
+            if (fm["Poster"] && typeof fm["Poster"] === "string") {
+                const posterUrl = this.getPosterUrl(fm["Poster"]);
                 if (posterUrl) {
                     posterContainer.setCssProps({ '--poster-bg': `url("${posterUrl}")` });
                 }
@@ -175,16 +178,20 @@ export class MoviesBasesView extends BasesView {
 
             const metaDiv = overlayContent.createDiv({ cls: "poster-overlay-meta" });
             const metaParts: string[] = [];
-            if (fm["Year"]) metaParts.push(fm["Year"].toString());
-            if (fm["Rating"]) metaParts.push(`⭐ ${fm["Rating"].toString()}/10`);
+            if (fm["Year"] && (typeof fm["Year"] === "number" || typeof fm["Year"] === "string")) {
+                metaParts.push(String(fm["Year"]));
+            }
+            if (fm["Rating"] && (typeof fm["Rating"] === "number" || typeof fm["Rating"] === "string")) {
+                metaParts.push(`⭐ ${String(fm["Rating"])}/10`);
+            }
             if (metaParts.length > 0) metaDiv.setText(metaParts.join(" • "));
 
             const badgesDiv = overlayContent.createDiv({ cls: "poster-overlay-badges" });
             this.renderStreamingBadges(badgesDiv, entry);
 
-            if (fm["Overview"]) {
+            if (fm["Overview"] && typeof fm["Overview"] === "string") {
                 const overviewDiv = overlayContent.createDiv({ cls: "poster-overlay-overview" });
-                overviewDiv.setText(fm["Overview"].toString());
+                overviewDiv.setText(fm["Overview"]);
             }
 
             posterItem.addClass("clickable");
@@ -215,12 +222,12 @@ export class MoviesBasesView extends BasesView {
         const fm = this.getFrontmatter(entry);
         const posterValue = fm["Poster"];
 
-        if (!posterValue) {
+        if (!posterValue || typeof posterValue !== "string") {
             this.renderPlaceholderPoster(container, entry, isPoster);
             return;
         }
 
-        const posterUrl = this.getPosterUrl(posterValue.toString());
+        const posterUrl = this.getPosterUrl(posterValue);
 
         if (posterUrl) {
             const img = container.createEl("img");
@@ -259,19 +266,19 @@ export class MoviesBasesView extends BasesView {
         const fm = this.getFrontmatter(entry);
         const parts: string[] = [];
 
-        if (fm["Type"]) {
-            const typeStr = fm["Type"].toString();
+        if (fm["Type"] && typeof fm["Type"] === "string") {
+            const typeStr = fm["Type"];
             const icon = typeStr === "movie" ? "🎬" : "📺";
             const text = typeStr === "movie" ? "Movie" : "TV Series";
             parts.push(`${icon} ${text}`);
         }
 
-        if (fm["Runtime"]) {
-            parts.push(`⏱️ ${fm["Runtime"].toString()}`);
+        if (fm["Runtime"] && (typeof fm["Runtime"] === "number" || typeof fm["Runtime"] === "string")) {
+            parts.push(`⏱️ ${String(fm["Runtime"])}`);
         }
 
-        if (fm["Rating"]) {
-            parts.push(`⭐ ${fm["Rating"].toString()}/10`);
+        if (fm["Rating"] && (typeof fm["Rating"] === "number" || typeof fm["Rating"] === "string")) {
+            parts.push(`⭐ ${String(fm["Rating"])}/10`);
         }
 
         if (parts.length > 0) {
@@ -341,7 +348,7 @@ export class MoviesBasesView extends BasesView {
         }
     }
 
-    static getViewOptions(): ViewOption[] {
+    static getViewOptions(this: void): ViewOption[] {
         return [
             {
                 displayName: "View mode",

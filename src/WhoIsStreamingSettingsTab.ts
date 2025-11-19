@@ -86,7 +86,7 @@ class JellyfinInstanceModal extends Modal {
       .setDesc("Jellyfin API key (generate in Dashboard → API Keys)")
       .addText((text) => {
         text
-          .setPlaceholder("API Key")
+          .setPlaceholder("API key")
           .setValue(this.instance.apiKey)
           .onChange((value) => {
             this.instance.apiKey = value;
@@ -94,11 +94,11 @@ class JellyfinInstanceModal extends Modal {
       });
 
     new Setting(contentEl)
-      .setName("User id")
+      .setName("User ID")
       .setDesc("Optional, if provided will be used to set watch status")
       .addText((text) => {
         text
-          .setPlaceholder("User Id")
+          .setPlaceholder("User ID")
           .setValue(this.instance.userId)
           .onChange((value) => {
             this.instance.userId = value;
@@ -146,7 +146,7 @@ export class WhoIsStreamingSettingsTab extends PluginSettingTab {
 
     const fragment = new DocumentFragment();
     const descDiv = fragment.createDiv({ cls: "setting-item-description" });
-    descDiv.appendText("Sign up for an API Key: ");
+    descDiv.appendText("Sign up for an API key: ");
     descDiv.createEl("a", {
       text: "https://www.movieofthenight.com/about/api",
       href: "https://www.movieofthenight.com/about/api"
@@ -156,11 +156,13 @@ export class WhoIsStreamingSettingsTab extends PluginSettingTab {
       .setName("API key")
       .setDesc(fragment)
       .addText((text) => {
-        text.setValue(this.plugin.settings.apiKey).onChange(async (value) => {
-          this.plugin.settings.apiKey = value;
-          await this.plugin.saveSettings();
-          this.plugin.setupApiClient();
-          await this.initializeCountries();
+        text.setValue(this.plugin.settings.apiKey).onChange((value) => {
+          void (async () => {
+            this.plugin.settings.apiKey = value;
+            await this.plugin.saveSettings();
+            this.plugin.setupApiClient();
+            await this.initializeCountries();
+          })();
         });
       });
 
@@ -176,19 +178,23 @@ export class WhoIsStreamingSettingsTab extends PluginSettingTab {
           .setLimits(0, 100, 5)
           .setValue(this.plugin.settings.rateLimitWarningThreshold)
           .setDynamicTooltip()
-          .onChange(async (value) => {
-            this.plugin.settings.rateLimitWarningThreshold = value;
-            await this.plugin.saveSettings();
+          .onChange((value) => {
+            void (async () => {
+              this.plugin.settings.rateLimitWarningThreshold = value;
+              await this.plugin.saveSettings();
+            })();
           });
       })
       .addExtraButton((button) => {
         button
           .setIcon("reset")
           .setTooltip("Reset to default (80%)")
-          .onClick(async () => {
-            this.plugin.settings.rateLimitWarningThreshold = 80;
-            await this.plugin.saveSettings();
-            this.display(); 
+          .onClick(() => {
+            void (async () => {
+              this.plugin.settings.rateLimitWarningThreshold = 80;
+              await this.plugin.saveSettings();
+              this.display();
+            })();
           });
       });
 
@@ -201,9 +207,11 @@ export class WhoIsStreamingSettingsTab extends PluginSettingTab {
         text
           .setPlaceholder("${title} (${year})")
           .setValue(this.plugin.settings.noteNameFormat)
-          .onChange(async (value) => {
-            this.plugin.settings.noteNameFormat = value;
-            await this.plugin.saveSettings();
+          .onChange((value) => {
+            void (async () => {
+              this.plugin.settings.noteNameFormat = value;
+              await this.plugin.saveSettings();
+            })();
           });
       });
 
@@ -214,9 +222,11 @@ export class WhoIsStreamingSettingsTab extends PluginSettingTab {
         text
           .setPlaceholder("${title} (${firstAirYear}-${lastAirYear})")
           .setValue(this.plugin.settings.noteNameFormatSeries)
-          .onChange(async (value) => {
-            this.plugin.settings.noteNameFormatSeries = value;
-            await this.plugin.saveSettings();
+          .onChange((value) => {
+            void (async () => {
+              this.plugin.settings.noteNameFormatSeries = value;
+              await this.plugin.saveSettings();
+            })();
           });
       });
 
@@ -231,9 +241,11 @@ export class WhoIsStreamingSettingsTab extends PluginSettingTab {
           .addOption("local", "Download posters locally")
           .addOption("remote", "Use remote posters")
           .setValue(this.plugin.settings.posterMode)
-          .onChange(async (value) => {
-            this.plugin.settings.posterMode = value as "none" | "local" | "remote";
-            await this.plugin.saveSettings();
+          .onChange((value) => {
+            void (async () => {
+              this.plugin.settings.posterMode = value as "none" | "local" | "remote";
+              await this.plugin.saveSettings();
+            })();
           });
       });
 
@@ -244,9 +256,11 @@ export class WhoIsStreamingSettingsTab extends PluginSettingTab {
         text
           .setPlaceholder("posters")
           .setValue(this.plugin.settings.posterFolder)
-          .onChange(async (value) => {
-            this.plugin.settings.posterFolder = value;
-            await this.plugin.saveSettings();
+          .onChange((value) => {
+            void (async () => {
+              this.plugin.settings.posterFolder = value;
+              await this.plugin.saveSettings();
+            })();
           });
       })
       .addButton((button) => {
@@ -260,10 +274,12 @@ export class WhoIsStreamingSettingsTab extends PluginSettingTab {
             new FolderSelectionModal(
               this.app,
               folderNames,
-              async (selectedFolder) => {
-                this.plugin.settings.posterFolder = selectedFolder;
-                await this.plugin.saveSettings();
-                this.display(); 
+              (selectedFolder) => {
+                void (async () => {
+                  this.plugin.settings.posterFolder = selectedFolder;
+                  await this.plugin.saveSettings();
+                  this.display();
+                })();
               }
             ).open();
           });
@@ -286,10 +302,12 @@ export class WhoIsStreamingSettingsTab extends PluginSettingTab {
               new JellyfinInstanceModal(
                 this.app,
                 { ...instance },
-                async (updatedInstance) => {
-                  this.plugin.settings.jellyfinInstances[index] = updatedInstance;
-                  await this.plugin.saveSettings();
-                  this.display();
+                (updatedInstance) => {
+                  void (async () => {
+                    this.plugin.settings.jellyfinInstances[index] = updatedInstance;
+                    await this.plugin.saveSettings();
+                    this.display();
+                  })();
                 }
               ).open();
             });
@@ -298,10 +316,12 @@ export class WhoIsStreamingSettingsTab extends PluginSettingTab {
           button
             .setButtonText("Remove")
             .setWarning()
-            .onClick(async () => {
-              this.plugin.settings.jellyfinInstances.splice(index, 1);
-              await this.plugin.saveSettings();
-              this.display();
+            .onClick(() => {
+              void (async () => {
+                this.plugin.settings.jellyfinInstances.splice(index, 1);
+                await this.plugin.saveSettings();
+                this.display();
+              })();
             });
         });
     });
@@ -315,10 +335,12 @@ export class WhoIsStreamingSettingsTab extends PluginSettingTab {
             new JellyfinInstanceModal(
               this.app,
               null,
-              async (newInstance) => {
-                this.plugin.settings.jellyfinInstances.push(newInstance);
-                await this.plugin.saveSettings();
-                this.display();
+              (newInstance) => {
+                void (async () => {
+                  this.plugin.settings.jellyfinInstances.push(newInstance);
+                  await this.plugin.saveSettings();
+                  this.display();
+                })();
               }
             ).open();
           });
@@ -334,9 +356,11 @@ export class WhoIsStreamingSettingsTab extends PluginSettingTab {
           text
             .setPlaceholder('FROM "Movies"\nWHERE Type = "movie"')
             .setValue(this.plugin.settings.bulkSyncDataviewQuery)
-            .onChange(async (value) => {
-              this.plugin.settings.bulkSyncDataviewQuery = value;
-              await this.plugin.saveSettings();
+            .onChange((value) => {
+              void (async () => {
+                this.plugin.settings.bulkSyncDataviewQuery = value;
+                await this.plugin.saveSettings();
+              })();
             });
         });
     }
@@ -349,9 +373,11 @@ export class WhoIsStreamingSettingsTab extends PluginSettingTab {
       .addToggle((toggle) => {
         toggle
           .setValue(this.plugin.settings.showPreviewDialog)
-          .onChange(async (value) => {
-            this.plugin.settings.showPreviewDialog = value;
-            await this.plugin.saveSettings();
+          .onChange((value) => {
+            void (async () => {
+              this.plugin.settings.showPreviewDialog = value;
+              await this.plugin.saveSettings();
+            })();
           });
       });
 
@@ -361,9 +387,11 @@ export class WhoIsStreamingSettingsTab extends PluginSettingTab {
       .addToggle((toggle) => {
         toggle
           .setValue(this.plugin.settings.addStreamingLinks)
-          .onChange(async (value) => {
-            this.plugin.settings.addStreamingLinks = value;
-            await this.plugin.saveSettings();
+          .onChange((value) => {
+            void (async () => {
+              this.plugin.settings.addStreamingLinks = value;
+              await this.plugin.saveSettings();
+            })();
           });
       });
 
@@ -393,18 +421,20 @@ export class WhoIsStreamingSettingsTab extends PluginSettingTab {
         .addToggle((toggle) => {
           toggle
             .setValue(this.plugin.settings.defaultEnabledFields.includes(field.id))
-            .onChange(async (value) => {
-              if (value) {
-                if (!this.plugin.settings.defaultEnabledFields.includes(field.id)) {
-                  this.plugin.settings.defaultEnabledFields.push(field.id);
+            .onChange((value) => {
+              void (async () => {
+                if (value) {
+                  if (!this.plugin.settings.defaultEnabledFields.includes(field.id)) {
+                    this.plugin.settings.defaultEnabledFields.push(field.id);
+                  }
+                } else {
+                  const index = this.plugin.settings.defaultEnabledFields.indexOf(field.id);
+                  if (index > -1) {
+                    this.plugin.settings.defaultEnabledFields.splice(index, 1);
+                  }
                 }
-              } else {
-                const index = this.plugin.settings.defaultEnabledFields.indexOf(field.id);
-                if (index > -1) {
-                  this.plugin.settings.defaultEnabledFields.splice(index, 1);
-                }
-              }
-              await this.plugin.saveSettings();
+                await this.plugin.saveSettings();
+              })();
             });
         });
     });
@@ -419,9 +449,11 @@ export class WhoIsStreamingSettingsTab extends PluginSettingTab {
           .setLimits(120, 300, 10)
           .setValue(this.plugin.settings.gridPosterSize)
           .setDynamicTooltip()
-          .onChange(async (value) => {
-            this.plugin.settings.gridPosterSize = value;
-            await this.plugin.saveSettings();
+          .onChange((value) => {
+            void (async () => {
+              this.plugin.settings.gridPosterSize = value;
+              await this.plugin.saveSettings();
+            })();
           });
       });
 
@@ -460,11 +492,13 @@ export class WhoIsStreamingSettingsTab extends PluginSettingTab {
         dropdown
           .addOptions(sorted)
           .setValue(this.plugin.settings.country)
-          .onChange(async (value) => {
-            this.plugin.settings.country = value;
-            this.plugin.settings.streamingServicesToSync = {};
-
-            void this.plugin.saveSettings().then(() => this.initializeStreamingServices());
+          .onChange((value) => {
+            void (async () => {
+              this.plugin.settings.country = value;
+              this.plugin.settings.streamingServicesToSync = {};
+              await this.plugin.saveSettings();
+              void this.initializeStreamingServices();
+            })();
           });
       });
     } catch (error: unknown) {
@@ -499,12 +533,14 @@ export class WhoIsStreamingSettingsTab extends PluginSettingTab {
           .addToggle((toggle) => {
             toggle
               .setValue(Object.hasOwn(this.plugin.settings.streamingServicesToSync, key))
-              .onChange(async (value) => {
-                if (value)
-                  this.plugin.settings.streamingServicesToSync[key] = service; 
-                else
-                  delete this.plugin.settings.streamingServicesToSync[key];
-                await this.plugin.saveSettings();
+              .onChange((value) => {
+                void (async () => {
+                  if (value)
+                    this.plugin.settings.streamingServicesToSync[key] = service;
+                  else
+                    delete this.plugin.settings.streamingServicesToSync[key];
+                  await this.plugin.saveSettings();
+                })();
               });
           });
       });
