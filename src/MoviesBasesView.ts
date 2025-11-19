@@ -12,7 +12,7 @@ export class MoviesBasesView extends BasesView {
     private viewMode: "cards" | "poster" = "cards";
     private posterSize: number;
 
-    constructor(controller: any, scrollEl: HTMLElement, plugin: WhoIsStreamingPlugin) {
+    constructor(controller: unknown, scrollEl: HTMLElement, plugin: WhoIsStreamingPlugin) {
         super(controller);
         this.scrollEl = scrollEl;
         this.plugin = plugin;
@@ -42,7 +42,7 @@ export class MoviesBasesView extends BasesView {
         this.posterSize = configPosterSize || this.plugin.settings.gridPosterSize;
     }
 
-    private getFrontmatter(entry: BasesEntry): any {
+    private getFrontmatter(entry: BasesEntry): Record<string, unknown> {
         const cache = this.app.metadataCache.getFileCache(entry.file);
         return cache?.frontmatter || {};
     }
@@ -145,7 +145,7 @@ export class MoviesBasesView extends BasesView {
     }
 
     private renderPosterView(container: HTMLElement, entries: BasesEntry[]): void {
-        container.style.setProperty("--poster-size", `${this.posterSize}px`);
+        container.setCssProps({ '--poster-size': `${this.posterSize}px` });
 
         for (const entry of entries) {
             const fm = this.getFrontmatter(entry);
@@ -156,7 +156,7 @@ export class MoviesBasesView extends BasesView {
             if (fm["Poster"]) {
                 const posterUrl = this.getPosterUrl(fm["Poster"].toString());
                 if (posterUrl) {
-                    posterContainer.style.setProperty("--poster-bg", `url("${posterUrl}")`);
+                    posterContainer.setCssProps({ '--poster-bg': `url("${posterUrl}")` });
                 }
             }
 

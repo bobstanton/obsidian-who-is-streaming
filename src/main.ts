@@ -1,7 +1,7 @@
 import { Editor, MarkdownView, Notice, Plugin, TFile, requestUrl } from "obsidian";
 import { getAPI, isPluginEnabled } from "obsidian-dataview";
 import { match, P } from "ts-pattern";
-import { Country, Service, ShowType, Show } from "streaming-availability";
+import { ShowType, Show } from "streaming-availability";
 import * as he from "he";
 import { WhoIsStreamingSettingsTab } from "./WhoIsStreamingSettingsTab";
 import { ShowSelectModal } from "./ShowSelectModal";
@@ -10,7 +10,23 @@ import { BulkSyncProgressModal } from "./BulkSyncProgressModal";
 import StreamingAvailabilityApiService from "./StreamingAvailabilityApiService";
 import JellyfinApiService, { JellyfinAvailability } from "./JellyfinApiService";
 import { MoviesBasesView, MoviesViewType } from "./MoviesBasesView";
-import { WhoIsStreamingSettings, JellyfinInstance, PosterMode, DEFAULT_SETTINGS } from "./settings";
+import { WhoIsStreamingSettings, DEFAULT_SETTINGS } from "./settings";
+
+interface DataviewValue {
+  path: string;
+}
+
+interface StreamingService {
+  service: { id: string };
+  type: string;
+  expiresOn?: number;
+  addon?: { name?: string; id?: string };
+  link?: string;
+}
+
+interface Genre {
+  name: string;
+}
 
 export default class WhoIsStreamingPlugin extends Plugin {
   settings: WhoIsStreamingSettings;
@@ -32,23 +48,23 @@ export default class WhoIsStreamingPlugin extends Plugin {
         options: MoviesBasesView.getViewOptions,
     });
 
-    const ribbonCommand = this.addRibbonIcon("popcorn", "Who Is Streaming", async (evt: MouseEvent) => {
-        ribbonCommand.setCssStyles({ 'pointerEvents': 'none' });
+    const ribbonCommand = this.addRibbonIcon("popcorn", "Who is streaming", async (evt: MouseEvent) => {
+        ribbonCommand.setCssProps({ 'pointerEvents': 'none' });
         await this.syncActiveFile();
-        ribbonCommand.setCssStyles({ 'pointerEvents': '' });
+        ribbonCommand.setCssProps({ 'pointerEvents': '' });
     });
-    this.addCommand({ id: "who-is-streaming", name: "Who Is Streaming", editorCallback: async (editor: Editor, view: MarkdownView) => {
+    this.addCommand({ id: "sync", name: "Sync", editorCallback: async (editor: Editor, view: MarkdownView) => {
         await this.syncActiveFile();
     }});
-    this.addCommand({ id: "who-is-streaming-sync-all", name: "Bulk Sync", callback: async () => {
+    this.addCommand({ id: "bulk-sync", name: "Bulk sync", callback: async () => {
         await this.syncAllFiles();
     }});
 
     if (this.settings.jellyfinInstances && this.settings.jellyfinInstances.length > 0) {
-      this.addCommand({ id: "sync-jellyfin-all", name: "Bulk Sync Jellyfin", callback: async () => {
+      this.addCommand({ id: "bulk-sync-jellyfin", name: "Bulk sync Jellyfin", callback: async () => {
           await this.syncJellyfinForAllFiles();
       }});
-      this.addCommand({ id: "sync-jellyfin-active", name: "Sync Jellyfin", editorCallback: async (editor: Editor, view: MarkdownView) => {
+      this.addCommand({ id: "sync-jellyfin", name: "Sync Jellyfin", editorCallback: async (editor: Editor, view: MarkdownView) => {
           await this.syncJellyfinActiveFile();
       }});
     }
@@ -84,7 +100,7 @@ export default class WhoIsStreamingPlugin extends Plugin {
             await this.syncFileWithShow(activeFile, show);
             return;
           }
-        } catch (error: any) {
+        } catch (error: unknown) {
           loadingNotice?.hide();
           const errorMessage = await this.streamingAvailabilityApi.handleApiError(error, false);
           new Notice(`❌ ${errorMessage || "Error fetching show"}`, 10000);
@@ -111,9 +127,10 @@ export default class WhoIsStreamingPlugin extends Plugin {
       new ShowSelectModal(this.app, results, async (selectedShow: Show) => {
         await this.syncFileWithShow(activeFile, selectedShow);
       }).open();
-    } catch (error) {
+    } catch (error: unknown) {
       loadingNotice?.hide();
       new Notice("❌ Failed to sync show. Check console for details.", 5000);
+      console.error('Sync failed:', error);
     }
   }
 
@@ -155,7 +172,7 @@ export default class WhoIsStreamingPlugin extends Plugin {
         this.settings.showPreviewDialog = originalSetting;
 
         progressModal.recordSuccess();
-      } catch (error) {
+      } catch (error: unknown) {
         const errorMessage = await this.streamingAvailabilityApi.handleApiError(error, false);
         progressModal.recordFailure(file.basename, errorMessage || "Unknown error");
       }
@@ -241,8 +258,9 @@ export default class WhoIsStreamingPlugin extends Plugin {
         });
 
         progressModal.recordSuccess();
-      } catch (error) {
-        progressModal.recordFailure(file.basename, error?.message || "Jellyfin sync error");
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : "Jellyfin sync error";
+        progressModal.recordFailure(file.basename, errorMessage);
       }
     }
 
@@ -302,8 +320,9 @@ export default class WhoIsStreamingPlugin extends Plugin {
       });
 
       new Notice("✅ Jellyfin sync complete");
-    } catch (error) {
+    } catch (error: unknown) {
       new Notice("❌ Failed to sync with Jellyfin");
+      console.error('Jellyfin sync failed:', error);
     }
   }
 
@@ -328,9 +347,9 @@ export default class WhoIsStreamingPlugin extends Plugin {
       return [];
     }
 
-    return results.value.values.map((value: any) =>
+    return results.value.values.map((value: DataviewValue) =>
       this.app.vault.getFileByPath(value.path)
-    );
+    ).filter((file): file is TFile => file !== null);
   }
 
   async syncFileWithShow(file: TFile, selectedShow: Show, isBulkSync: boolean = false): Promise<void> {
@@ -383,8 +402,8 @@ export default class WhoIsStreamingPlugin extends Plugin {
     });
   }
 
-  async getCurrentFrontmatter(file: TFile): Promise<any> {
-    let frontmatter: any = {};
+  async getCurrentFrontmatter(file: TFile): Promise<Record<string, unknown>> {
+    let frontmatter: Record<string, unknown> = {};
     await this.app.fileManager.processFrontMatter(file, (fm) => {
       frontmatter = { ...fm };
     });
@@ -423,10 +442,10 @@ export default class WhoIsStreamingPlugin extends Plugin {
       .replace(/[/\\?%*:|"<>]/g, "-");
   }
 
-  syncFrontMatter(frontmatter: any, selectedShow: Show, jellyfinAvailability: JellyfinAvailability[] = [], enabledFields?: string[]) {
+  syncFrontMatter(frontmatter: Record<string, unknown>, selectedShow: Show, jellyfinAvailability: JellyfinAvailability[] = [], enabledFields?: string[]) {
     const isFieldEnabled = (fieldName: string) => !enabledFields || enabledFields.includes(fieldName);
 
-    const showsStreamingServices = (selectedShow.streamingOptions[this.settings.country] || []).filter((service: any) => {
+    const showsStreamingServices = (selectedShow.streamingOptions[this.settings.country] || []).filter((service: StreamingService) => {
       return (!service.addon?.id?.startsWith("tvs.sbd") && (service.type === "subscription" ||
           service.type === "addon")
       );
@@ -434,14 +453,14 @@ export default class WhoIsStreamingPlugin extends Plugin {
 
     const tmdbId = selectedShow.tmdbId.split('/').pop() || selectedShow.tmdbId;
 
-    const fieldValues: Record<string, any> = {
+    const fieldValues: Record<string, unknown> = {
       "tmdb_id": parseInt(tmdbId),
       "Type": isFieldEnabled("Type") ? selectedShow.showType : undefined,
       "Year": isFieldEnabled("Year") ? (selectedShow.releaseYear || selectedShow.firstAirYear) : undefined,
       "Directors": isFieldEnabled("Directors") ? selectedShow.directors : undefined,
       "Cast": isFieldEnabled("Cast") ? selectedShow.cast : undefined,
       "Overview": isFieldEnabled("Overview") ? he.decode(selectedShow.overview) : undefined,
-      "Genres": isFieldEnabled("Genres") ? selectedShow.genres.map((genre: any) => genre.name) : undefined,
+      "Genres": isFieldEnabled("Genres") ? selectedShow.genres.map((genre: Genre) => genre.name) : undefined,
     };
 
     if (selectedShow.runtime) {
@@ -476,10 +495,10 @@ export default class WhoIsStreamingPlugin extends Plugin {
         const description = matchedService === undefined
           ? "Not available"
           : match(matchedService)
-              .with({ type: "subscription", expiresOn: P._ }, () => `Available until ${new Date(matchedService!.expiresOn! * 1000).toLocaleDateString()}`)
+              .with({ type: "subscription", expiresOn: P._ }, (service) => `Available until ${new Date(service.expiresOn * 1000).toLocaleDateString()}`)
               .with({ type: "subscription" }, () => `Available`)
-              .with({ type: "addon" }, () => {
-                return matchedService!.addon?.name ? `Available with ${matchedService!.addon.name}` : "Available with addon";
+              .with({ type: "addon" }, (service) => {
+                return service.addon?.name ? `Available with ${service.addon.name}` : "Available with addon";
               })
               .otherwise(() => "Not available?" + JSON.stringify(matchedService));
 
@@ -559,8 +578,9 @@ export default class WhoIsStreamingPlugin extends Plugin {
       });
 
       await this.app.vault.adapter.writeBinary(posterPath, response.arrayBuffer);
-    } catch (error) {
-      
+    } catch (error: unknown) {
+      // Silently fail - poster download is optional and shouldn't block sync
+      console.debug('Poster download failed:', error);
     }
   }
 

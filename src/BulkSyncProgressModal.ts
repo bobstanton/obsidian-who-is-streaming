@@ -26,7 +26,7 @@ export class BulkSyncProgressModal extends Modal {
 
     const progressContainer = contentEl.createDiv({ cls: "progress-container" });
     this.progressBarEl = progressContainer.createDiv({ cls: "progress-bar" });
-    this.progressBarEl.style.width = "0%";
+    this.progressBarEl.setCssProps({ width: "0%" });
 
     this.statusEl = contentEl.createDiv({ cls: "progress-status" });
     this.updateStatus();
@@ -47,7 +47,7 @@ export class BulkSyncProgressModal extends Modal {
   updateProgress(currentFile: string) {
     this.currentIndex++;
     const percentage = Math.round((this.currentIndex / this.totalFiles) * 100);
-    this.progressBarEl.style.width = `${percentage}%`;
+    this.progressBarEl.setCssProps({ width: `${percentage}%` });
     this.updateStatus();
     this.detailsEl.setText(`Syncing: ${currentFile}`);
   }

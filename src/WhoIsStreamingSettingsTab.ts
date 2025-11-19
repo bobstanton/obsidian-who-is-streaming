@@ -82,7 +82,7 @@ class JellyfinInstanceModal extends Modal {
       });
 
     new Setting(contentEl)
-      .setName("API Key")
+      .setName("API key")
       .setDesc("Jellyfin API key (generate in Dashboard → API Keys)")
       .addText((text) => {
         text
@@ -137,12 +137,12 @@ export class WhoIsStreamingSettingsTab extends PluginSettingTab {
     this.streamingServicesElement = createDiv();
   }
 
-  async display(): Promise<void> {
+  display(): void {
     const { containerEl } = this;
 
     containerEl.empty();
 
-    new Setting(containerEl).setName("API Configuration").setHeading();
+    new Setting(containerEl).setName("API configuration").setHeading();
 
     const fragment = new DocumentFragment();
     const descDiv = fragment.createDiv({ cls: "setting-item-description" });
@@ -153,7 +153,7 @@ export class WhoIsStreamingSettingsTab extends PluginSettingTab {
     });
 
     new Setting(containerEl)
-      .setName("API Key")
+      .setName("API key")
       .setDesc(fragment)
       .addText((text) => {
         text.setValue(this.plugin.settings.apiKey).onChange(async (value) => {
@@ -269,7 +269,7 @@ export class WhoIsStreamingSettingsTab extends PluginSettingTab {
           });
       });
 
-    new Setting(containerEl).setName("Jellyfin Integration").setHeading();
+    new Setting(containerEl).setName("Jellyfin integration").setHeading();
 
     new Setting(containerEl)
       .setName("Jellyfin instances")
@@ -309,7 +309,7 @@ export class WhoIsStreamingSettingsTab extends PluginSettingTab {
     new Setting(containerEl)
       .addButton((button) => {
         button
-          .setButtonText("Add Jellyfin Instance")
+          .setButtonText("Add Jellyfin instance")
           .setCta()
           .onClick(() => {
             new JellyfinInstanceModal(
@@ -427,8 +427,8 @@ export class WhoIsStreamingSettingsTab extends PluginSettingTab {
 
     containerEl.append(this.streamingServicesElement);
 
-    await this.initializeCountries();
-    await this.initializeStreamingServices();
+    void this.initializeCountries();
+    void this.initializeStreamingServices();
   }
 
   async initializeCountries(): Promise<void> {
@@ -464,12 +464,12 @@ export class WhoIsStreamingSettingsTab extends PluginSettingTab {
             this.plugin.settings.country = value;
             this.plugin.settings.streamingServicesToSync = {};
 
-            await this.plugin.saveSettings();
-            await this.initializeStreamingServices();
+            void this.plugin.saveSettings().then(() => this.initializeStreamingServices());
           });
       });
-    } catch (error) {
-      
+    } catch (error: unknown) {
+      // Silently fail if countries cannot be loaded - user can still use plugin with cached data
+      console.debug('Failed to load countries:', error);
     }
   }
 
@@ -498,7 +498,7 @@ export class WhoIsStreamingSettingsTab extends PluginSettingTab {
           .setName(service.name)
           .addToggle((toggle) => {
             toggle
-              .setValue(this.plugin.settings.streamingServicesToSync.hasOwnProperty(key))
+              .setValue(Object.hasOwn(this.plugin.settings.streamingServicesToSync, key))
               .onChange(async (value) => {
                 if (value)
                   this.plugin.settings.streamingServicesToSync[key] = service; 
@@ -518,8 +518,9 @@ export class WhoIsStreamingSettingsTab extends PluginSettingTab {
         href: "https://www.movieofthenight.com/about/api"
       });
       attributionSetting.descEl.appendText(" but is not affiliated with Movie of the Night.");
-    } catch (error) {
-      
+    } catch (error: unknown) {
+      // Silently fail if streaming services cannot be loaded
+      console.debug('Failed to initialize streaming services:', error);
     }
   }
 }

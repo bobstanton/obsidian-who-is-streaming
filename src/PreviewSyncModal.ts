@@ -11,16 +11,28 @@ interface FieldChange {
   isPoster?: boolean; 
 }
 
+interface Genre {
+  name: string;
+}
+
+interface StreamingService {
+  service: { id: string };
+  type: string;
+  expiresOn?: number;
+  addon?: { name?: string; id?: string };
+  link?: string;
+}
+
 export class PreviewSyncModal extends Modal {
   show: Show;
   settings: WhoIsStreamingSettings;
-  currentFrontmatter: any;
+  currentFrontmatter: Record<string, unknown>;
   currentFileName: string;
   callback: (confirmed: boolean, enabledFields?: string[]) => void;
   changes: FieldChange[] = [];
   newFileName: string = "";
 
-  constructor(app: App, show: Show, settings: WhoIsStreamingSettings, currentFrontmatter: any, currentFileName: string, callback: (confirmed: boolean, enabledFields?: string[]) => void) {
+  constructor(app: App, show: Show, settings: WhoIsStreamingSettings, currentFrontmatter: Record<string, unknown>, currentFileName: string, callback: (confirmed: boolean, enabledFields?: string[]) => void) {
     super(app);
     this.show = show;
     this.settings = settings;
@@ -80,7 +92,7 @@ export class PreviewSyncModal extends Modal {
     }
 
     if (this.show.genres && this.show.genres.length > 0) {
-      this.checkArrayFieldChange("Genres", this.show.genres.map((g: any) => g.name));
+      this.checkArrayFieldChange("Genres", this.show.genres.map((g: Genre) => g.name));
     }
 
     if (this.show.imageSet?.verticalPoster?.w480) {
@@ -106,12 +118,12 @@ export class PreviewSyncModal extends Modal {
       this.checkFieldChange("Episodes", this.show.episodeCount.toString());
     }
 
-    const showsStreamingServices = (this.show.streamingOptions[this.settings.country] || []).filter((service: any) => {
+    const showsStreamingServices = (this.show.streamingOptions[this.settings.country] || []).filter((service: StreamingService) => {
       return (!service.addon?.id?.startsWith("tvs.sbd") && (service.type === "subscription" || service.type === "addon"));
     });
 
     Object.entries(this.settings.streamingServicesToSync).forEach(([key, streamingServiceToSync]) => {
-      const matchedService = showsStreamingServices.find((showsService: any) => showsService.service.id === streamingServiceToSync.id);
+      const matchedService = showsStreamingServices.find((showsService: StreamingService) => showsService.service.id === streamingServiceToSync.id);
 
       if (matchedService) {
         const description = matchedService.type === "subscription"
@@ -124,7 +136,7 @@ export class PreviewSyncModal extends Modal {
     });
   }
 
-  checkFieldChange(field: string, newValue: any) {
+  checkFieldChange(field: string, newValue: unknown) {
     const oldValue = this.currentFrontmatter[field];
     const newValueStr = newValue?.toString() || "";
     const oldValueStr = oldValue?.toString() || "";
@@ -146,7 +158,7 @@ export class PreviewSyncModal extends Modal {
     }
   }
 
-  checkArrayFieldChange(field: string, newValue: any[]) {
+  checkArrayFieldChange(field: string, newValue: unknown[]) {
     const oldValue = this.currentFrontmatter[field];
     const newValueStr = newValue.join(", ");
     const oldValueStr = Array.isArray(oldValue) ? oldValue.join(", ") : (oldValue?.toString() || "");

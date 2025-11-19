@@ -67,7 +67,7 @@ export class ShowSelectModal extends SuggestModal<Show> {
 
     if (show.genres && show.genres.length > 0) {
       const genresDiv = detailsDiv.createDiv({ cls: "show-genres" });
-      genresDiv.setText(show.genres.map((g: any) => g.name).join(", "));
+      genresDiv.setText(show.genres.map((g: { name: string }) => g.name).join(", "));
     }
 
     const people = [...(show.directors ?? []), ...(show.creators ?? []), ...(show.cast ?? [])].slice(0, 3).join(", ");

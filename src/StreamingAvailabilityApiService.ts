@@ -47,7 +47,7 @@ export default class StreamingAvailabilityApiService {
       this.settings.countriesCacheAsOf = new Date(Date.now());
 
       return countriesData;
-    } catch (error: any) {
+    } catch (error: unknown) {
       await this.handleApiError(error);
       return {};
     }
@@ -72,7 +72,7 @@ export default class StreamingAvailabilityApiService {
       const show = await apiResponse.value();
       this.apiShowCache.set(cacheKey, show);
       return show;
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (!showNotice) {
         throw error;
       }
@@ -103,13 +103,13 @@ export default class StreamingAvailabilityApiService {
       this.apiSearchCache.set(cacheKey, results);
 
       return results;
-    } catch (error: any) {
+    } catch (error: unknown) {
       await this.handleApiError(error);
       return [];
     }
   }
 
-  async handleApiError(error: any, showNotice: boolean = true): Promise<string | undefined> {
+  async handleApiError(error: unknown, showNotice: boolean = true): Promise<string | undefined> {
     if ("response" in error) {
       if (error.response.status === 429) {
         let message = "API rate limit exceeded.";
@@ -122,8 +122,8 @@ export default class StreamingAvailabilityApiService {
               message = data.message;
             }
           }
-        } catch (e) {
-
+        } catch (e: unknown) {
+          // Failed to parse error response - use default message
         }
 
         if (showNotice) {
@@ -141,7 +141,7 @@ export default class StreamingAvailabilityApiService {
               message = data.message;
             }
           }
-        } catch (e) {
+        } catch (e: unknown) {
           if (error.response.status === 404) {
             message = "Show not found in the streaming database.";
           } else if (error.response.status >= 500) {
