@@ -1,5 +1,11 @@
 import { BasesEntry, BasesView, Keymap, ViewOption, setIcon } from "obsidian";
 import WhoIsStreamingPlugin from "./main";
+import {
+    getFrontmatterString,
+    getFrontmatterStringOrNumber,
+    frontmatterEquals,
+    frontmatterNotEquals
+} from "./frontmatterUtils";
 
 export const MoviesViewType = "movies";
 
@@ -105,10 +111,8 @@ export class MoviesBasesView extends BasesView {
             titleEl.setText(entry.file.basename);
 
             const yearEl = headerDiv.createSpan({ cls: "movie-card-year" });
-            if (fm["Year"]) {
-                const year = typeof fm["Year"] === "number" || typeof fm["Year"] === "string" ? String(fm["Year"]) : "";
-                if (year) yearEl.setText(year);
-            }
+            const year = getFrontmatterStringOrNumber(fm, "Year");
+            if (year) yearEl.setText(year);
 
             this.renderMetadata(detailsDiv, entry);
 
@@ -118,9 +122,10 @@ export class MoviesBasesView extends BasesView {
 
             this.renderStreamingBadges(detailsDiv, entry);
 
-            if (fm["Overview"] && typeof fm["Overview"] === "string") {
+            const overview = getFrontmatterString(fm, "Overview");
+            if (overview) {
                 const overviewDiv = detailsDiv.createDiv({ cls: "movie-card-overview" });
-                overviewDiv.setText(fm["Overview"]);
+                overviewDiv.setText(overview);
             }
 
             card.addClass("clickable");
@@ -156,8 +161,9 @@ export class MoviesBasesView extends BasesView {
 
             const posterContainer = posterItem.createDiv({ cls: "poster-container" });
 
-            if (fm["Poster"] && typeof fm["Poster"] === "string") {
-                const posterUrl = this.getPosterUrl(fm["Poster"]);
+            const posterStr = getFrontmatterString(fm, "Poster");
+            if (posterStr) {
+                const posterUrl = this.getPosterUrl(posterStr);
                 if (posterUrl) {
                     posterContainer.setCssProps({ '--poster-bg': `url("${posterUrl}")` });
                 }
@@ -178,20 +184,21 @@ export class MoviesBasesView extends BasesView {
 
             const metaDiv = overlayContent.createDiv({ cls: "poster-overlay-meta" });
             const metaParts: string[] = [];
-            if (fm["Year"] && (typeof fm["Year"] === "number" || typeof fm["Year"] === "string")) {
-                metaParts.push(String(fm["Year"]));
-            }
-            if (fm["Rating"] && (typeof fm["Rating"] === "number" || typeof fm["Rating"] === "string")) {
-                metaParts.push(`⭐ ${String(fm["Rating"])}/10`);
-            }
+            const year = getFrontmatterStringOrNumber(fm, "Year");
+            if (year) metaParts.push(year);
+
+            const rating = getFrontmatterStringOrNumber(fm, "Rating");
+            if (rating) metaParts.push(`⭐ ${rating}/10`);
+
             if (metaParts.length > 0) metaDiv.setText(metaParts.join(" • "));
 
             const badgesDiv = overlayContent.createDiv({ cls: "poster-overlay-badges" });
             this.renderStreamingBadges(badgesDiv, entry);
 
-            if (fm["Overview"] && typeof fm["Overview"] === "string") {
+            const posterOverview = getFrontmatterString(fm, "Overview");
+            if (posterOverview) {
                 const overviewDiv = overlayContent.createDiv({ cls: "poster-overlay-overview" });
-                overviewDiv.setText(fm["Overview"]);
+                overviewDiv.setText(posterOverview);
             }
 
             posterItem.addClass("clickable");
@@ -220,9 +227,9 @@ export class MoviesBasesView extends BasesView {
 
     private renderPoster(container: HTMLElement, entry: BasesEntry, isPoster: boolean): void {
         const fm = this.getFrontmatter(entry);
-        const posterValue = fm["Poster"];
+        const posterValue = getFrontmatterString(fm, "Poster");
 
-        if (!posterValue || typeof posterValue !== "string") {
+        if (!posterValue) {
             this.renderPlaceholderPoster(container, entry, isPoster);
             return;
         }
@@ -266,19 +273,21 @@ export class MoviesBasesView extends BasesView {
         const fm = this.getFrontmatter(entry);
         const parts: string[] = [];
 
-        if (fm["Type"] && typeof fm["Type"] === "string") {
-            const typeStr = fm["Type"];
+        const typeStr = getFrontmatterString(fm, "Type");
+        if (typeStr) {
             const icon = typeStr === "movie" ? "🎬" : "📺";
             const text = typeStr === "movie" ? "Movie" : "TV Series";
             parts.push(`${icon} ${text}`);
         }
 
-        if (fm["Runtime"] && (typeof fm["Runtime"] === "number" || typeof fm["Runtime"] === "string")) {
-            parts.push(`⏱️ ${String(fm["Runtime"])}`);
+        const runtime = getFrontmatterStringOrNumber(fm, "Runtime");
+        if (runtime) {
+            parts.push(`⏱️ ${runtime}`);
         }
 
-        if (fm["Rating"] && (typeof fm["Rating"] === "number" || typeof fm["Rating"] === "string")) {
-            parts.push(`⭐ ${String(fm["Rating"])}/10`);
+        const metaRating = getFrontmatterStringOrNumber(fm, "Rating");
+        if (metaRating) {
+            parts.push(`⭐ ${metaRating}/10`);
         }
 
         if (parts.length > 0) {
@@ -326,14 +335,13 @@ export class MoviesBasesView extends BasesView {
         const badges: string[] = [];
 
         for (const service of streamingServices) {
-            const value = fm[service];
-            if (!value || value.toString() === "Not available") continue;
-            badges.push(service);
+            if (frontmatterNotEquals(fm, service, "Not available")) {
+                badges.push(service);
+            }
         }
 
         for (const instance of this.plugin.settings.jellyfinInstances) {
-            const value = fm[instance.name];
-            if (value && value.toString() === "Available") {
+            if (frontmatterEquals(fm, instance.name, "Available")) {
                 badges.push(instance.name);
             }
         }

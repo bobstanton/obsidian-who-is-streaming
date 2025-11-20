@@ -124,8 +124,8 @@ export default class WhoIsStreamingPlugin extends Plugin {
         return;
       }
 
-      new ShowSelectModal(this.app, results, async (selectedShow: Show) => {
-        await this.syncFileWithShow(activeFile, selectedShow);
+      new ShowSelectModal(this.app, results, (selectedShow: Show) => {
+        void this.syncFileWithShow(activeFile, selectedShow);
       }).open();
     } catch (error: unknown) {
       loadingNotice?.hide();
