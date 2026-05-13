@@ -9,8 +9,7 @@
 }
 
 /* Shared styles for poster and icon fallback */
-.who-is-streaming-suggestion .suggestion-poster,
-.who-is-streaming-suggestion .suggestion-icon-fallback {
+.who-is-streaming-suggestion :is(.suggestion-poster, .suggestion-icon-fallback) {
   flex-shrink: 0;
   width: 60px;
   height: 90px;
@@ -162,10 +161,27 @@
 }
 
 .who-is-streaming-progress-modal .progress-bar {
+  width: 100%;
   height: 100%;
+  appearance: none;
+  border: 0;
+}
+
+.who-is-streaming-progress-modal .progress-bar::-webkit-progress-bar {
+  background: var(--background-secondary);
+}
+
+.who-is-streaming-progress-modal .progress-bar::-webkit-progress-value {
   background: var(--interactive-accent);
   transition: width 0.3s ease;
-  border-radius: 12px;
+}
+
+.who-is-streaming-progress-modal .progress-bar::-moz-progress-bar {
+  background: var(--interactive-accent);
+}
+
+.who-is-streaming-ribbon-disabled {
+  pointer-events: none;
 }
 
 .who-is-streaming-progress-modal .progress-status {
@@ -287,7 +303,7 @@
     padding: 12px 20px;
   }
 
-  .setting-item-control {
+  .who-is-streaming-textarea .setting-item-control {
     min-width: 50px;
     min-height: 44px;
     display: flex;
@@ -472,8 +488,7 @@
   pointer-events: none;
 }
 
-.movie-poster-item .poster-container img,
-.movie-poster-item .poster-container > div:not(.watched-checkbox-overlay) {
+.movie-poster-item .poster-container :is(img, > div:not(.watched-checkbox-overlay)) {
   width: 100%;
   height: 100%;
   position: relative;
@@ -603,8 +618,7 @@
 }
 
 /* Shared poster placeholder styles */
-.poster-placeholder-card,
-.poster-placeholder-poster {
+:is(.poster-placeholder-card, .poster-placeholder-poster) {
   background: var(--background-secondary);
   border: 1px solid var(--background-modifier-border);
   display: flex;
@@ -617,8 +631,7 @@
   overflow: hidden;
 }
 
-.poster-placeholder-card::before,
-.poster-placeholder-poster::before {
+:is(.poster-placeholder-card, .poster-placeholder-poster)::before {
   content: '🎬';
   opacity: 0.4;
 }
@@ -729,8 +742,19 @@
   background-color: var(--background-modifier-hover);
 }
 
-.modal-button-container {
+.who-is-streaming-modal-button-container {
   margin-top: 20px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--size-4-2);
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.who-is-streaming-setting-description {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  line-height: var(--line-height-tight);
 }
 
 .jellyfin-modal-buttons {

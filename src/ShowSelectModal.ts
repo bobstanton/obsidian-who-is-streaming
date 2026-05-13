@@ -1,6 +1,6 @@
 import { App, SuggestModal, setIcon } from "obsidian";
 import { Show } from "streaming-availability";
-import * as he from "he";
+import { decode } from "he";
 
 export class ShowSelectModal extends SuggestModal<Show> {
   showMatches: Show[];
@@ -67,16 +67,23 @@ export class ShowSelectModal extends SuggestModal<Show> {
 
     if (show.genres && show.genres.length > 0) {
       const genresDiv = detailsDiv.createDiv({ cls: "show-genres" });
-      genresDiv.setText(show.genres.map((g: { name: string }) => g.name).join(", "));
+      const genreNames = show.genres
+        .map((genre: { name?: unknown }) => genre.name)
+        .filter((name): name is string => typeof name === "string");
+      genresDiv.setText(genreNames.join(", "));
     }
 
-    const people = [...(show.directors ?? []), ...(show.creators ?? []), ...(show.cast ?? [])].slice(0, 3).join(", ");
+    const people = [...(show.directors ?? []), ...(show.creators ?? []), ...(show.cast ?? [])]
+      .filter((name): name is string => typeof name === "string")
+      .slice(0, 3)
+      .join(", ");
     if (people) {
       detailsDiv.createEl("small", { text: people, cls: "show-people" });
     }
 
-    const overview = he.decode(show.overview);
-    if (overview) {
+    const decodedOverview = typeof show.overview === "string" ? decode(show.overview) : "";
+    const overview = typeof decodedOverview === "string" ? decodedOverview : "";
+    if (overview.length > 0) {
       const overviewDiv = detailsDiv.createDiv({ cls: "show-overview" });
       overviewDiv.setText(overview);
     }

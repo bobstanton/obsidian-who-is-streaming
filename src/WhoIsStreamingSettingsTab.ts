@@ -1,7 +1,7 @@
 import { App, Modal, PluginSettingTab, Setting, Notice } from "obsidian";
-import { isPluginEnabled } from "obsidian-dataview";
 import WhoIsStreamingPlugin from "./main";
 import { JellyfinInstance } from "./settings";
+import { isDataviewPluginEnabled } from "./dataviewApi";
 
 class FolderSelectionModal extends Modal {
   folders: string[];
@@ -30,7 +30,7 @@ class FolderSelectionModal extends Modal {
       });
     });
 
-    const buttonContainer = contentEl.createDiv({ cls: "modal-button-container" });
+    const buttonContainer = contentEl.createDiv({ cls: "who-is-streaming-modal-button-container" });
 
     const cancelBtn = buttonContainer.createEl("button");
     cancelBtn.setText("Cancel");
@@ -59,10 +59,10 @@ class JellyfinInstanceModal extends Modal {
 
     new Setting(contentEl)
       .setName("Name")
-      .setDesc("A friendly name for this Jellyfin instance")
+      .setDesc("Display name for this server")
       .addText((text) => {
         text
-          .setPlaceholder("My Jellyfin server")
+          .setPlaceholder("My server")
           .setValue(this.instance.name)
           .onChange((value) => {
             this.instance.name = value;
@@ -71,10 +71,10 @@ class JellyfinInstanceModal extends Modal {
 
     new Setting(contentEl)
       .setName("URL")
-      .setDesc("Jellyfin server URL (e.g., http://localhost:8096)")
+      .setDesc("Server URL")
       .addText((text) => {
         text
-          .setPlaceholder("http://localhost:8096")
+          .setPlaceholder("Server URL")
           .setValue(this.instance.url)
           .onChange((value) => {
             this.instance.url = value;
@@ -83,7 +83,7 @@ class JellyfinInstanceModal extends Modal {
 
     new Setting(contentEl)
       .setName("API key")
-      .setDesc("Jellyfin API key (generate in Dashboard → API keys)")
+      .setDesc("Generate this in the server dashboard API keys page.")
       .addText((text) => {
         text
           .setPlaceholder("API key")
@@ -95,7 +95,7 @@ class JellyfinInstanceModal extends Modal {
 
     new Setting(contentEl)
       .setName("User ID")
-      .setDesc("Optional, if provided will be used to set watch status")
+      .setDesc("Optional. Used to sync watched status.")
       .addText((text) => {
         text
           .setPlaceholder("User ID")
@@ -137,6 +137,14 @@ export class WhoIsStreamingSettingsTab extends PluginSettingTab {
     this.streamingServicesElement = createDiv();
   }
 
+  saveSettings(update: () => void, afterSave?: () => void | Promise<void>): void {
+    void (async () => {
+      update();
+      await this.plugin.saveSettings();
+      await afterSave?.();
+    })();
+  }
+
   display(): void {
     const { containerEl } = this;
 
@@ -145,10 +153,10 @@ export class WhoIsStreamingSettingsTab extends PluginSettingTab {
     new Setting(containerEl).setName("API configuration").setHeading();
 
     const fragment = new DocumentFragment();
-    const descDiv = fragment.createDiv({ cls: "setting-item-description" });
+    const descDiv = fragment.createDiv({ cls: "who-is-streaming-setting-description" });
     descDiv.appendText("Sign up for an API key: ");
     descDiv.createEl("a", {
-      text: "https://www.movieofthenight.com/about/api",
+      text: "Streaming Availability API signup",
       href: "https://www.movieofthenight.com/about/api"
     });
 
@@ -157,12 +165,12 @@ export class WhoIsStreamingSettingsTab extends PluginSettingTab {
       .setDesc(fragment)
       .addText((text) => {
         text.setValue(this.plugin.settings.apiKey).onChange((value) => {
-          void (async () => {
+          this.saveSettings(() => {
             this.plugin.settings.apiKey = value;
-            await this.plugin.saveSettings();
+          }, async () => {
             this.plugin.setupApiClient();
             await this.initializeCountries();
-          })();
+          });
         });
       });
 
@@ -179,10 +187,9 @@ export class WhoIsStreamingSettingsTab extends PluginSettingTab {
           .setValue(this.plugin.settings.rateLimitWarningThreshold)
           .setDynamicTooltip()
           .onChange((value) => {
-            void (async () => {
+            this.saveSettings(() => {
               this.plugin.settings.rateLimitWarningThreshold = value;
-              await this.plugin.saveSettings();
-            })();
+            });
           });
       })
       .addExtraButton((button) => {
@@ -190,11 +197,11 @@ export class WhoIsStreamingSettingsTab extends PluginSettingTab {
           .setIcon("reset")
           .setTooltip("Reset to default (80%)")
           .onClick(() => {
-            void (async () => {
+            this.saveSettings(() => {
               this.plugin.settings.rateLimitWarningThreshold = 80;
-              await this.plugin.saveSettings();
+            }, () => {
               this.display();
-            })();
+            });
           });
       });
 
@@ -208,25 +215,23 @@ export class WhoIsStreamingSettingsTab extends PluginSettingTab {
           .setPlaceholder("${title} (${year})")
           .setValue(this.plugin.settings.noteNameFormat)
           .onChange((value) => {
-            void (async () => {
+            this.saveSettings(() => {
               this.plugin.settings.noteNameFormat = value;
-              await this.plugin.saveSettings();
-            })();
+            });
           });
       });
 
     new Setting(containerEl)
-      .setName("TV series note format")
-      .setDesc("Format for TV series notes. Available: ${title}, ${firstAirYear}, ${lastAirYear}, ${tmdb_id}, ${rating}")
+      .setName("Series note format")
+      .setDesc("Format for series notes. Available: ${title}, ${firstAirYear}, ${lastAirYear}, ${tmdb_id}, ${rating}")
       .addText((text) => {
         text
           .setPlaceholder("${title} (${firstAirYear}-${lastAirYear})")
           .setValue(this.plugin.settings.noteNameFormatSeries)
           .onChange((value) => {
-            void (async () => {
+            this.saveSettings(() => {
               this.plugin.settings.noteNameFormatSeries = value;
-              await this.plugin.saveSettings();
-            })();
+            });
           });
       });
 
@@ -242,10 +247,9 @@ export class WhoIsStreamingSettingsTab extends PluginSettingTab {
           .addOption("remote", "Use remote posters")
           .setValue(this.plugin.settings.posterMode)
           .onChange((value) => {
-            void (async () => {
+            this.saveSettings(() => {
               this.plugin.settings.posterMode = value as "none" | "local" | "remote";
-              await this.plugin.saveSettings();
-            })();
+            });
           });
       });
 
@@ -257,10 +261,9 @@ export class WhoIsStreamingSettingsTab extends PluginSettingTab {
           .setPlaceholder("Posters")
           .setValue(this.plugin.settings.posterFolder)
           .onChange((value) => {
-            void (async () => {
+            this.saveSettings(() => {
               this.plugin.settings.posterFolder = value;
-              await this.plugin.saveSettings();
-            })();
+            });
           });
       })
       .addButton((button) => {
@@ -275,11 +278,11 @@ export class WhoIsStreamingSettingsTab extends PluginSettingTab {
               this.app,
               folderNames,
               (selectedFolder) => {
-                void (async () => {
+                this.saveSettings(() => {
                   this.plugin.settings.posterFolder = selectedFolder;
-                  await this.plugin.saveSettings();
+                }, () => {
                   this.display();
-                })();
+                });
               }
             ).open();
           });
@@ -289,7 +292,7 @@ export class WhoIsStreamingSettingsTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Jellyfin instances")
-      .setDesc("Add Jellyfin servers to check for movie availability");
+      .setDesc("Add servers to check for movie availability");
 
     this.plugin.settings.jellyfinInstances.forEach((instance, index) => {
       new Setting(containerEl)
@@ -303,11 +306,11 @@ export class WhoIsStreamingSettingsTab extends PluginSettingTab {
                 this.app,
                 { ...instance },
                 (updatedInstance) => {
-                  void (async () => {
+                  this.saveSettings(() => {
                     this.plugin.settings.jellyfinInstances[index] = updatedInstance;
-                    await this.plugin.saveSettings();
+                  }, () => {
                     this.display();
-                  })();
+                  });
                 }
               ).open();
             });
@@ -317,11 +320,11 @@ export class WhoIsStreamingSettingsTab extends PluginSettingTab {
             .setButtonText("Remove")
             .setWarning()
             .onClick(() => {
-              void (async () => {
+              this.saveSettings(() => {
                 this.plugin.settings.jellyfinInstances.splice(index, 1);
-                await this.plugin.saveSettings();
+              }, () => {
                 this.display();
-              })();
+              });
             });
         });
     });
@@ -329,38 +332,37 @@ export class WhoIsStreamingSettingsTab extends PluginSettingTab {
     new Setting(containerEl)
       .addButton((button) => {
         button
-          .setButtonText("Add Jellyfin instance")
+          .setButtonText("Add server")
           .setCta()
           .onClick(() => {
             new JellyfinInstanceModal(
               this.app,
               null,
               (newInstance) => {
-                void (async () => {
+                this.saveSettings(() => {
                   this.plugin.settings.jellyfinInstances.push(newInstance);
-                  await this.plugin.saveSettings();
+                }, () => {
                   this.display();
-                })();
+                });
               }
             ).open();
           });
       });
 
-    if (isPluginEnabled(this.app)) {
-      new Setting(containerEl).setName("Bulk sync").setHeading();
+    if (isDataviewPluginEnabled(this.app)) {
+      new Setting(containerEl).setName("Bulk refresh").setHeading();
       new Setting(containerEl)
         .setName("Dataview query")
-        .setDesc("Filter which notes to sync when using 'Sync all shows'")
+        .setDesc("Filter which notes to refresh when using bulk refresh")
         .setClass("who-is-streaming-textarea")
         .addTextArea((text) => {
           text
-            .setPlaceholder('FROM "Movies"\nWHERE Type = "movie"')
+            .setPlaceholder("Dataview query")
             .setValue(this.plugin.settings.bulkSyncDataviewQuery)
             .onChange((value) => {
-              void (async () => {
+              this.saveSettings(() => {
                 this.plugin.settings.bulkSyncDataviewQuery = value;
-                await this.plugin.saveSettings();
-              })();
+              });
             });
         });
     }
@@ -374,10 +376,9 @@ export class WhoIsStreamingSettingsTab extends PluginSettingTab {
         toggle
           .setValue(this.plugin.settings.showPreviewDialog)
           .onChange((value) => {
-            void (async () => {
+            this.saveSettings(() => {
               this.plugin.settings.showPreviewDialog = value;
-              await this.plugin.saveSettings();
-            })();
+            });
           });
       });
 
@@ -388,16 +389,15 @@ export class WhoIsStreamingSettingsTab extends PluginSettingTab {
         toggle
           .setValue(this.plugin.settings.addStreamingLinks)
           .onChange((value) => {
-            void (async () => {
+            this.saveSettings(() => {
               this.plugin.settings.addStreamingLinks = value;
-              await this.plugin.saveSettings();
-            })();
+            });
           });
       });
 
     containerEl.createEl("p", {
-      text: "Select which fields should be synced by default in preview and bulk sync operations. Note: Type and tmdb_id are always synced and cannot be disabled.",
-      cls: "setting-item-description"
+      text: "Choose the fields enabled by default for preview and bulk refresh. Required fields are always included.",
+      cls: "who-is-streaming-setting-description"
     });
 
     const fieldDefinitions = [
@@ -422,7 +422,7 @@ export class WhoIsStreamingSettingsTab extends PluginSettingTab {
           toggle
             .setValue(this.plugin.settings.defaultEnabledFields.includes(field.id))
             .onChange((value) => {
-              void (async () => {
+              this.saveSettings(() => {
                 if (value) {
                   if (!this.plugin.settings.defaultEnabledFields.includes(field.id)) {
                     this.plugin.settings.defaultEnabledFields.push(field.id);
@@ -433,8 +433,7 @@ export class WhoIsStreamingSettingsTab extends PluginSettingTab {
                     this.plugin.settings.defaultEnabledFields.splice(index, 1);
                   }
                 }
-                await this.plugin.saveSettings();
-              })();
+              });
             });
         });
     });
@@ -450,10 +449,9 @@ export class WhoIsStreamingSettingsTab extends PluginSettingTab {
           .setValue(this.plugin.settings.gridPosterSize)
           .setDynamicTooltip()
           .onChange((value) => {
-            void (async () => {
+            this.saveSettings(() => {
               this.plugin.settings.gridPosterSize = value;
-              await this.plugin.saveSettings();
-            })();
+            });
           });
       });
 
@@ -477,14 +475,14 @@ export class WhoIsStreamingSettingsTab extends PluginSettingTab {
 
       const userCountryCode = Intl.DateTimeFormat().resolvedOptions().locale.split("-")[1]?.toLowerCase() || "us";
 
-      const sortedCountries = Object.entries(countries).sort(([lk, lv], [rk, rv]) => {
+      const sortedCountries = Object.values(countries).sort((lv, rv) => {
         if (lv.countryCode === userCountryCode) return -1;
         if (rv.countryCode === userCountryCode) return 1;
         return lv.name.localeCompare(rv.name);
       });
 
       const sorted: { [key: string]: string } = { "": "" };
-      for (const [key, country] of sortedCountries) {
+      for (const country of sortedCountries) {
         sorted[country.countryCode] = country.name;
       }
 
@@ -493,16 +491,16 @@ export class WhoIsStreamingSettingsTab extends PluginSettingTab {
           .addOptions(sorted)
           .setValue(this.plugin.settings.country)
           .onChange((value) => {
-            void (async () => {
+            this.saveSettings(() => {
               this.plugin.settings.country = value;
               this.plugin.settings.streamingServicesToSync = {};
-              await this.plugin.saveSettings();
+            }, () => {
               void this.initializeStreamingServices();
-            })();
+            });
           });
       });
     } catch (error: unknown) {
-      // Silently fail if countries cannot be loaded - user can still use plugin with cached data
+      // Keep cached country data if refresh fails.
       console.debug('Failed to load countries:', error);
     }
   }
@@ -525,22 +523,21 @@ export class WhoIsStreamingSettingsTab extends PluginSettingTab {
         return;
       }
 
-      Object.entries(
-        countries[this.plugin.settings.country].services
-      ).forEach(([key, service]) => {
+      countries[this.plugin.settings.country].services.forEach((service) => {
+        const key = service.id;
+        const isEnabled = Object.prototype.hasOwnProperty.call(this.plugin.settings.streamingServicesToSync, key) === true;
         new Setting(this.streamingServicesElement)
           .setName(service.name)
           .addToggle((toggle) => {
             toggle
-              .setValue(Object.hasOwn(this.plugin.settings.streamingServicesToSync, key))
+              .setValue(isEnabled)
               .onChange((value) => {
-                void (async () => {
+                this.saveSettings(() => {
                   if (value)
                     this.plugin.settings.streamingServicesToSync[key] = service;
                   else
                     delete this.plugin.settings.streamingServicesToSync[key];
-                  await this.plugin.saveSettings();
-                })();
+                });
               });
           });
       });
@@ -550,12 +547,12 @@ export class WhoIsStreamingSettingsTab extends PluginSettingTab {
       attributionSetting.descEl.empty();
       attributionSetting.descEl.appendText("This plugin uses ");
       attributionSetting.descEl.createEl("a", {
-        text: "Streaming Availability API by Movie of the Night",
+        text: "Streaming Availability API",
         href: "https://www.movieofthenight.com/about/api"
       });
-      attributionSetting.descEl.appendText(" but is not affiliated with Movie of the Night.");
+      attributionSetting.descEl.appendText(" for streaming availability data.");
     } catch (error: unknown) {
-      // Silently fail if streaming services cannot be loaded
+      // Leave the current service list unchanged if refresh fails.
       console.debug('Failed to initialize streaming services:', error);
     }
   }

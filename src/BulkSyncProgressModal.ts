@@ -5,7 +5,7 @@ export class BulkSyncProgressModal extends Modal {
   currentIndex: number = 0;
   successCount: number = 0;
   failureCount: number = 0;
-  progressBarEl: HTMLElement;
+  progressBarEl: HTMLProgressElement;
   statusEl: HTMLElement;
   detailsEl: HTMLElement;
   errorsEl: HTMLElement;
@@ -22,11 +22,16 @@ export class BulkSyncProgressModal extends Modal {
     contentEl.empty();
     contentEl.addClass("who-is-streaming-progress-modal");
 
-    contentEl.createEl("h2", { text: "Syncing shows" });
+    contentEl.createEl("h2", { text: "Refreshing shows" });
 
     const progressContainer = contentEl.createDiv({ cls: "progress-container" });
-    this.progressBarEl = progressContainer.createDiv({ cls: "progress-bar" });
-    this.progressBarEl.setCssProps({ width: "0%" });
+    this.progressBarEl = progressContainer.createEl("progress", {
+      cls: "progress-bar",
+      attr: {
+        max: "100",
+        value: "0",
+      },
+    });
 
     this.statusEl = contentEl.createDiv({ cls: "progress-status" });
     this.updateStatus();
@@ -47,15 +52,15 @@ export class BulkSyncProgressModal extends Modal {
   updateProgress(currentFile: string) {
     this.currentIndex++;
     const percentage = Math.round((this.currentIndex / this.totalFiles) * 100);
-    this.progressBarEl.setCssProps({ width: `${percentage}%` });
+    this.progressBarEl.value = percentage;
     this.updateStatus();
-    this.detailsEl.setText(`Syncing: ${currentFile}`);
+    this.detailsEl.setText(`Refreshing ${currentFile}`);
   }
 
   updateStatus() {
     const percentage = Math.round((this.currentIndex / this.totalFiles) * 100);
     this.statusEl.setText(
-      `Progress: ${this.currentIndex}/${this.totalFiles} (${percentage}%) | ` + `Success: ${this.successCount} | Failed: ${this.failureCount}`
+      `Progress ${this.currentIndex}/${this.totalFiles} (${percentage}%) | ` + `Success ${this.successCount} | Failed ${this.failureCount}`
     );
   }
 
@@ -83,7 +88,7 @@ export class BulkSyncProgressModal extends Modal {
     this.errorsEl.removeClass("hidden");
     this.errorsEl.empty();
 
-    const errorHeader = this.errorsEl.createEl("h4", { text: "Errors:", cls: "progress-error-header" });
+    this.errorsEl.createEl("h4", { text: "Errors:", cls: "progress-error-header" });
 
     const errorList = this.errorsEl.createEl("div", { cls: "progress-error-list" });
 
@@ -98,9 +103,9 @@ export class BulkSyncProgressModal extends Modal {
     errorGroups.forEach((files, error) => {
       const errorItem = errorList.createDiv({ cls: "progress-error-item" });
 
-      const errorText = errorItem.createEl("strong", { text: error, cls: "progress-error-text" });
+      errorItem.createEl("strong", { text: error, cls: "progress-error-text" });
 
-      const fileCount = errorItem.createDiv({ text: `${files.length} file(s) affected`, cls: "progress-error-file-count" });
+      errorItem.createDiv({ text: `${files.length} file(s) affected`, cls: "progress-error-file-count" });
     });
   }
 

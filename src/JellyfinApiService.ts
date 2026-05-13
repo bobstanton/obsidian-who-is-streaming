@@ -15,6 +15,10 @@ export interface JellyfinItem {
   };
 }
 
+interface JellyfinSearchResponse {
+  Items?: JellyfinItem[];
+}
+
 export interface JellyfinAvailability {
   instanceName: string;
   available: boolean;
@@ -68,6 +72,7 @@ export default class JellyfinApiService {
     try {
       const baseUrl = instance.url.replace(/\/+$/, '');
       const itemType = showType === "movie" ? "Movie" : "Series";
+      const tmdbIdText = String(tmdbId);
 
       let allItems = this.getCachedItems(baseUrl, itemType);
 
@@ -86,15 +91,18 @@ export default class JellyfinApiService {
           return { available: false };
         }
 
-        const searchData = searchResponse.json;
-        allItems = searchData.Items || [];
+        const searchData = parseJellyfinSearchResponse(searchResponse.json);
+        const foundItems = searchData.Items || [];
+        allItems = foundItems;
 
-        this.setCachedItems(baseUrl, itemType, allItems);
+        this.setCachedItems(baseUrl, itemType, foundItems);
       }
+
+      allItems = allItems || [];
 
       const matchingItems = allItems.filter((item: JellyfinItem) => {
         const itemTmdbId = item.ProviderIds?.Tmdb;
-        return itemTmdbId && itemTmdbId === tmdbId.toString();
+        return itemTmdbId && itemTmdbId === tmdbIdText;
       });
 
       if (matchingItems.length === 0) {
@@ -115,8 +123,8 @@ export default class JellyfinApiService {
         });
 
         if (userItemResponse.status === 200 && userItemResponse.json) {
-          const userItem = userItemResponse.json;
-          const watched = userItem.UserData?.Played || false;
+          const userItem = parseJellyfinItem(userItemResponse.json);
+          const watched = userItem?.UserData?.Played === true;
 
           return { available: true, itemId: jellyfinItemId, watched };
         }
@@ -124,7 +132,7 @@ export default class JellyfinApiService {
 
       return { available: true, itemId: jellyfinItemId, watched: false };
 
-    } catch (error) {
+    } catch {
       return { available: false };
     }
   }
@@ -145,4 +153,29 @@ export default class JellyfinApiService {
     return results;
   }
 
+}
+
+function parseJellyfinSearchResponse(value: unknown): JellyfinSearchResponse {
+  if (!isRecord(value) || !Array.isArray(value.Items)) {
+    return {};
+  }
+
+  return {
+    Items: value.Items.filter(isJellyfinItem),
+  };
+}
+
+function parseJellyfinItem(value: unknown): JellyfinItem | undefined {
+  return isJellyfinItem(value) ? value : undefined;
+}
+
+function isJellyfinItem(value: unknown): value is JellyfinItem {
+  return isRecord(value)
+    && typeof value.Name === "string"
+    && typeof value.Id === "string"
+    && typeof value.Type === "string";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }

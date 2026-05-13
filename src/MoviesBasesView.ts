@@ -1,13 +1,31 @@
-import { BasesEntry, BasesView, Keymap, ViewOption, setIcon } from "obsidian";
+import { BasesEntry, BasesView, Keymap, QueryController, setIcon } from "obsidian";
 import WhoIsStreamingPlugin from "./main";
 import {
     getFrontmatterString,
     getFrontmatterStringOrNumber,
+    getFrontmatterStringArray,
     frontmatterEquals,
     frontmatterNotEquals
 } from "./frontmatterUtils";
 
 export const MoviesViewType = "movies";
+
+type MoviesViewOption =
+    | {
+        displayName: string;
+        type: "dropdown";
+        key: string;
+        options: Record<string, string>;
+        default: string;
+    }
+    | {
+        displayName: string;
+        type: "slider";
+        key: string;
+        min: number;
+        max: number;
+        step: number;
+    };
 
 export class MoviesBasesView extends BasesView {
     type = MoviesViewType;
@@ -18,7 +36,7 @@ export class MoviesBasesView extends BasesView {
     private viewMode: "cards" | "poster" = "cards";
     private posterSize: number;
 
-    constructor(controller: unknown, scrollEl: HTMLElement, plugin: WhoIsStreamingPlugin) {
+    constructor(controller: QueryController, scrollEl: HTMLElement, plugin: WhoIsStreamingPlugin) {
         super(controller);
         this.scrollEl = scrollEl;
         this.plugin = plugin;
@@ -45,7 +63,9 @@ export class MoviesBasesView extends BasesView {
         this.viewMode = (configViewMode === "poster" || configViewMode === "cards") ? configViewMode : "cards";
 
         const configPosterSize = this.config.get("posterSize");
-        this.posterSize = configPosterSize || this.plugin.settings.gridPosterSize;
+        this.posterSize = typeof configPosterSize === "number"
+            ? configPosterSize
+            : this.plugin.settings.gridPosterSize;
     }
 
     private getFrontmatter(entry: BasesEntry): Record<string, unknown> {
@@ -153,7 +173,7 @@ export class MoviesBasesView extends BasesView {
     }
 
     private renderPosterView(container: HTMLElement, entries: BasesEntry[]): void {
-        container.setCssProps({ '--poster-size': `${this.posterSize}px` });
+        container.setCssProps({ "--poster-size": `${this.posterSize}px` });
 
         for (const entry of entries) {
             const fm = this.getFrontmatter(entry);
@@ -165,7 +185,7 @@ export class MoviesBasesView extends BasesView {
             if (posterStr) {
                 const posterUrl = this.getPosterUrl(posterStr);
                 if (posterUrl) {
-                    posterContainer.setCssProps({ '--poster-bg': `url("${posterUrl}")` });
+                    posterContainer.setCssProps({ "--poster-bg": `url("${posterUrl}")` });
                 }
             }
 
@@ -247,7 +267,7 @@ export class MoviesBasesView extends BasesView {
     }
 
     private renderPlaceholderPoster(container: HTMLElement, entry: BasesEntry, isPoster: boolean): void {
-        const placeholder = container.createDiv({
+        container.createDiv({
             cls: isPoster ? "poster-placeholder-poster" : "poster-placeholder-card",
             text: entry.file.basename
         });
@@ -298,22 +318,25 @@ export class MoviesBasesView extends BasesView {
 
     private renderGenres(container: HTMLElement, entry: BasesEntry): void {
         const fm = this.getFrontmatter(entry);
-        if (!fm["Genres"] || !Array.isArray(fm["Genres"])) return;
+        const genres = getFrontmatterStringArray(fm, "Genres");
+        if (!genres || genres.length === 0) return;
 
         const genresDiv = container.createDiv({ cls: "movie-genres" });
-        genresDiv.setText(fm["Genres"].join(", "));
+        genresDiv.setText(genres.join(", "));
     }
 
     private renderPeople(container: HTMLElement, entry: BasesEntry): void {
         const fm = this.getFrontmatter(entry);
         const peopleSegments: { label: string; names: string }[] = [];
 
-        if (fm["Directors"] && Array.isArray(fm["Directors"])) {
-            peopleSegments.push({ label: "Director:", names: fm["Directors"].join(", ") });
+        const directors = getFrontmatterStringArray(fm, "Directors");
+        if (directors && directors.length > 0) {
+            peopleSegments.push({ label: "Director:", names: directors.join(", ") });
         }
 
-        if (fm["Cast"] && Array.isArray(fm["Cast"])) {
-            peopleSegments.push({ label: "Cast:", names: fm["Cast"].join(", ") });
+        const cast = getFrontmatterStringArray(fm, "Cast");
+        if (cast && cast.length > 0) {
+            peopleSegments.push({ label: "Cast:", names: cast.join(", ") });
         }
 
         if (peopleSegments.length > 0) {
@@ -356,7 +379,7 @@ export class MoviesBasesView extends BasesView {
         }
     }
 
-    static getViewOptions(this: void): ViewOption[] {
+    static getViewOptions(this: void): MoviesViewOption[] {
         return [
             {
                 displayName: "View mode",

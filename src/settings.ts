@@ -1,6 +1,15 @@
-import { Country, Service } from "streaming-availability";
-
 export type PosterMode = "none" | "local" | "remote";
+
+export interface StreamingServiceSetting {
+  id: string;
+  name: string;
+}
+
+export interface StreamingCountrySetting {
+  countryCode: string;
+  name: string;
+  services: StreamingServiceSetting[];
+}
 
 export interface JellyfinInstance {
   /**
@@ -38,7 +47,7 @@ export interface WhoIsStreamingSettings {
   /**
    * Cache all available countries and their streaming services as this doesn't change often. Will be refreshed weekly.
    */
-  countriesCache: { [key: string]: Country };
+  countriesCache: { [key: string]: StreamingCountrySetting };
 
   /**
    * The date the countries cache was last updated.
@@ -56,7 +65,7 @@ export interface WhoIsStreamingSettings {
   noteNameFormatSeries: string;
 
   /**
-   * Dataview query to execute when bulk syncing shows
+   * Dataview query to execute when bulk refreshing shows
    */
   bulkSyncDataviewQuery: string;
 
@@ -64,7 +73,7 @@ export interface WhoIsStreamingSettings {
    * The streaming services to sync with.
    * The key represents the service name, and the value represents the streaming availability service.
    */
-  streamingServicesToSync: { [key: string]: Service };
+  streamingServicesToSync: { [key: string]: StreamingServiceSetting };
 
   /**
    * How to handle poster images: "none", "local", or "remote"
@@ -105,8 +114,8 @@ export interface WhoIsStreamingSettings {
   rateLimitWarningThreshold: number;
 
   /**
-   * Fields that are enabled by default in preview and bulk sync.
-   * Note: "Type" and "tmdb_id" are always required and cannot be disabled.
+   * Fields that are enabled by default in preview and bulk refresh.
+   * "Type" and "tmdb_id" are always required and cannot be disabled.
    * Special values:
    * - "File Name" - rename the note
    * - "Poster" - poster image

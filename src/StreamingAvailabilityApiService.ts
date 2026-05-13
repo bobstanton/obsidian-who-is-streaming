@@ -1,6 +1,6 @@
-import { Client, Configuration, Show, Country } from "streaming-availability";
-import { WhoIsStreamingSettings } from "./settings";
-import { Notice } from "obsidian";
+import { Client, Configuration, Show } from "streaming-availability";
+import { StreamingCountrySetting, WhoIsStreamingSettings } from "./settings";
+import { Notice, requestUrl } from "obsidian";
 
 export default class StreamingAvailabilityApiService {
   settings: WhoIsStreamingSettings;
@@ -12,14 +12,15 @@ export default class StreamingAvailabilityApiService {
     this.settings = settings;
 
     this.apiClient = new Client(new Configuration({
-        apiKey: this.settings.apiKey,
+        apiKey: () => this.settings.apiKey.trim(),
+        fetchApi: obsidianFetch,
     }));
 
     this.apiShowCache = new Map<string, Show | undefined>();
     this.apiSearchCache = new Map<string, Array<Show>>();
   }
 
-  async getCountries(): Promise<{ [key: string]: Country }> {
+  async getCountries(): Promise<{ [key: string]: StreamingCountrySetting }> {
     if (!this.validateApiKey()) {
       return {};
     }
@@ -53,10 +54,10 @@ export default class StreamingAvailabilityApiService {
     }
   }
 
-  async getShowByTmdbId(showType: string, tmdb_id: number, showNotice: boolean = true): Promise<Show | undefined> {
-    const cacheKey = `getShowByTmdbId:${showType}/${tmdb_id}`;
+  async getShowByTmdbId(showType: string, tmdb_id: number, showNotice: boolean = true, forceRefresh: boolean = false): Promise<Show | undefined> {
+    const cacheKey = `getShowByTmdbId|${showType}/${tmdb_id}`;
     const cachedResponse = this.apiShowCache.get(cacheKey);
-    if (cachedResponse) return cachedResponse;
+    if (cachedResponse && !forceRefresh) return cachedResponse;
 
     const tmdbIdType = showType === "movie" ? "movie" : "tv";
 
@@ -87,7 +88,7 @@ export default class StreamingAvailabilityApiService {
       return [];
     }
 
-    const cacheKey = `searchForShowsByTitle:${searchTerm}`;
+    const cacheKey = `searchForShowsByTitle|${searchTerm}`;
     const cachedResponse = this.apiSearchCache.get(cacheKey);
     if (cachedResponse) return cachedResponse;
 
@@ -110,58 +111,43 @@ export default class StreamingAvailabilityApiService {
   }
 
   async handleApiError(error: unknown, showNotice: boolean = true): Promise<string | undefined> {
-    if ("response" in error) {
-      if (error.response.status === 429) {
-        let message = "API rate limit exceeded.";
-
-        try {
-          if (error.response.body && typeof error.response.clone === 'function') {
-            const clonedResponse = error.response.clone();
-            const data = await clonedResponse.json();
-            if (data?.message) {
-              message = data.message;
-            }
-          }
-        } catch (e: unknown) {
-          // Failed to parse error response - use default message
-        }
-
-        if (showNotice) {
-          new Notice(message, 10000);
-        }
-        return message;
-      } else {
-        let message = "Unable to fetch show information from the streaming API.";
-
-        try {
-          if (error.response.body && typeof error.response.clone === 'function') {
-            const clonedResponse = error.response.clone();
-            const data = await clonedResponse.json();
-            if (data?.message) {
-              message = data.message;
-            }
-          }
-        } catch (e: unknown) {
-          if (error.response.status === 404) {
-            message = "Show not found in the streaming database.";
-          } else if (error.response.status >= 500) {
-            message = "Streaming API server error. Please try again later.";
-          }
-        }
-
-        if (showNotice) {
-          new Notice(message);
-        }
-        return message;
-      }
+    if (!isApiError(error)) {
+      return undefined;
     }
 
-    return undefined;
+    const status = error.response.status;
+    const message = await this.getApiErrorMessage(error, status);
+    if (showNotice) {
+      new Notice(message, status === 429 ? 10000 : 5000);
+    }
+    return message;
+  }
+
+  async getApiErrorMessage(error: ApiError, status: number): Promise<string> {
+    const responseMessage = await readResponseMessage(error.response);
+    if (responseMessage) {
+      return responseMessage;
+    }
+
+    if (status === 429) {
+      return "API rate limit exceeded.";
+    }
+
+    if (status === 404) {
+      return "Show not found in the streaming database.";
+    }
+
+    if (status >= 500) {
+      return "Streaming API server error. Please try again later.";
+    }
+
+    return `Streaming API request failed with HTTP ${status}.`;
   }
 
   validateApiKey(): boolean {
-    if (this.settings.apiKey?.length !== 50) {
-      new Notice("No API key or API key is in incorrect format");
+    const apiKey = this.settings.apiKey?.trim();
+    if (!apiKey || (!apiKey.startsWith("motn-key-") && apiKey.length !== 50)) {
+      new Notice("Add a valid Streaming Availability API key in settings.");
       return false;
     }
 
@@ -184,38 +170,208 @@ export default class StreamingAvailabilityApiService {
       return;
     }
 
-    const limit = headers.get("x-ratelimit-api-request-limit");
-    const remaining = headers.get("x-ratelimit-api-request-remaining");
-    const resetSeconds = headers.get("x-ratelimit-api-request-reset");
+    const limit = getRateLimitHeader(headers, RATE_LIMIT_HEADER_NAMES.limit);
+    const remaining = getRateLimitHeader(headers, RATE_LIMIT_HEADER_NAMES.remaining);
+    const reset = getRateLimitHeader(headers, RATE_LIMIT_HEADER_NAMES.reset);
 
     if (!limit || remaining === null) {
       return;
     }
 
-    const limitNum = parseInt(limit);
-    const remainingNum = parseInt(remaining);
+    const limitNum = parseRateLimitHeader(limit);
+    const remainingNum = parseRateLimitHeader(remaining);
+    if (limitNum === undefined || remainingNum === undefined || limitNum <= 0) {
+      return;
+    }
+
     const percentageUsed = ((limitNum - remainingNum) / limitNum) * 100;
-    const percentageRemaining = (remainingNum / limitNum) * 100;
 
-    if (percentageUsed >= this.settings.rateLimitWarningThreshold && remainingNum > 0) {
-      let message = `⚠️ API Rate Limit Warning: ${remainingNum}/${limitNum} requests remaining (${percentageUsed.toFixed(0)}% used)`;
+    if (percentageUsed >= this.settings.rateLimitWarningThreshold) {
+      let message = `⚠️ API Rate Limit Warning: ${formatRateLimitValue(remainingNum)}/${formatRateLimitValue(limitNum)} requests remaining (${percentageUsed.toFixed(0)}% used)`;
 
-      if (resetSeconds) {
-        const seconds = parseInt(resetSeconds);
-        const hours = Math.floor(seconds / 3600);
-        const minutes = Math.floor((seconds % 3600) / 60);
-
-        if (hours > 0) {
-          message += `. Resets in ${hours}h ${minutes}m`;
-        } else if (minutes > 0) {
-          message += `. Resets in ${minutes}m`;
-        } else {
-          message += `. Resets in ${seconds}s`;
-        }
+      const resetMessage = getRateLimitResetMessage(reset);
+      if (resetMessage) {
+        message += `. ${resetMessage}`;
       }
 
       message += ".";
       new Notice(message, 8000);
     }
   }
+}
+
+interface ApiError {
+  response: {
+    status: number;
+    body?: unknown;
+    clone?: () => {
+      json: () => Promise<{ message?: string }>;
+    };
+  };
+}
+
+function isApiError(error: unknown): error is ApiError {
+  const response = typeof error === "object"
+    && error !== null
+    && "response" in error
+    ? (error as { response?: unknown }).response
+    : undefined;
+
+  return typeof response === "object"
+    && response !== null
+    && "status" in response
+    && typeof (response as { status?: unknown }).status === "number";
+}
+
+async function readResponseMessage(response: ApiError["response"]): Promise<string | undefined> {
+  if (!response.body || typeof response.clone !== "function") {
+    return undefined;
+  }
+
+  try {
+    const data = await response.clone().json();
+    return data.message;
+  } catch {
+    return undefined;
+  }
+}
+
+const RATE_LIMIT_HEADER_NAMES = {
+  limit: [
+    "x-ratelimit-requests-limit",
+    "x-ratelimit-limit",
+    "ratelimit-limit",
+    "x-ratelimit-api-request-limit",
+    "x-ratelimit-request-limit",
+  ],
+  remaining: [
+    "x-ratelimit-requests-remaining",
+    "x-ratelimit-remaining",
+    "ratelimit-remaining",
+    "x-ratelimit-api-request-remaining",
+    "x-ratelimit-request-remaining",
+  ],
+  reset: [
+    "x-ratelimit-reset",
+    "ratelimit-reset",
+    "x-ratelimit-requests-reset",
+    "x-ratelimit-api-request-reset",
+    "x-ratelimit-request-reset",
+  ],
+};
+
+function getRateLimitHeader(headers: Headers, names: string[]): string | null {
+  for (const name of names) {
+    const value = headers.get(name);
+    if (value !== null) {
+      return value;
+    }
+  }
+
+  return null;
+}
+
+function parseRateLimitHeader(value: string): number | undefined {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function getRateLimitResetMessage(reset: string | null): string | undefined {
+  if (reset === null) {
+    return undefined;
+  }
+
+  const resetValue = parseRateLimitHeader(reset);
+  if (resetValue === undefined || resetValue <= 0) {
+    return undefined;
+  }
+
+  const currentUnixTime = Math.floor(Date.now() / 1000);
+  const seconds = resetValue > currentUnixTime
+    ? Math.max(0, Math.ceil(resetValue - currentUnixTime))
+    : resetValue;
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+
+  if (hours > 0) {
+    return `Resets in ${hours}h ${minutes}m`;
+  }
+
+  if (minutes > 0) {
+    return `Resets in ${minutes}m`;
+  }
+
+  return `Resets in ${Math.ceil(seconds)}s`;
+}
+
+function formatRateLimitValue(value: number): string {
+  return Number.isInteger(value) ? value.toString() : value.toFixed(1);
+}
+
+async function obsidianFetch(url: string, init: RequestInit): Promise<Response> {
+  const response = await requestUrl({
+    url,
+    method: init.method,
+    headers: normalizeRequestHeaders(init.headers),
+    body: await normalizeRequestBody(init.body),
+    throw: false,
+  });
+
+  return new Response(response.arrayBuffer, {
+    status: response.status,
+    headers: response.headers,
+  });
+}
+
+function normalizeRequestHeaders(headers: HeadersInit | undefined): Record<string, string> {
+  const normalizedHeaders: Record<string, string> = {};
+  if (!headers) {
+    return normalizedHeaders;
+  }
+
+  if (headers instanceof Headers) {
+    headers.forEach((value, key) => {
+      normalizedHeaders[key] = value;
+    });
+    return normalizedHeaders;
+  }
+
+  if (Array.isArray(headers)) {
+    headers.forEach(([key, value]) => {
+      normalizedHeaders[key] = value;
+    });
+    return normalizedHeaders;
+  }
+
+  Object.entries(headers).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedHeaders[key] = String(value);
+    }
+  });
+
+  return normalizedHeaders;
+}
+
+async function normalizeRequestBody(body: BodyInit | null | undefined): Promise<string | ArrayBuffer | undefined> {
+  if (body === null || body === undefined) {
+    return undefined;
+  }
+
+  if (typeof body === "string" || body instanceof ArrayBuffer) {
+    return body;
+  }
+
+  if (ArrayBuffer.isView(body)) {
+    return body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength);
+  }
+
+  if (body instanceof URLSearchParams) {
+    return body.toString();
+  }
+
+  if (body instanceof Blob) {
+    return body.arrayBuffer();
+  }
+
+  throw new Error("Unsupported Streaming Availability request body type.");
 }

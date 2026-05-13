@@ -1,31 +1,63 @@
+import tseslint from "typescript-eslint";
 import obsidianmd from "eslint-plugin-obsidianmd";
-import typescriptEslint from "@typescript-eslint/eslint-plugin";
-import tsParser from "@typescript-eslint/parser";
+import { DEFAULT_BRANDS } from "eslint-plugin-obsidianmd/dist/lib/rules/ui/brands.js";
+import globals from "globals";
+import { globalIgnores } from "eslint/config";
 
-export default [
-  {
-    ignores: ["main.js", "node_modules/**", ".obsidian/**"]
-  },
-  {
-    files: ["**/*.ts"],
-    languageOptions: {
-      parser: tsParser,
-      parserOptions: {
-        sourceType: "module",
-        project: "./tsconfig.json"
-      }
-    },
-    plugins: {
-      "@typescript-eslint": typescriptEslint,
-      "obsidianmd": obsidianmd
-    },
-    rules: {
-      ...obsidianmd.configs.recommended,
-      "no-unused-vars": "off",
-      "@typescript-eslint/no-unused-vars": "off",
-      "@typescript-eslint/ban-ts-comment": "off",
-      "no-prototype-builtins": "off",
-      "@typescript-eslint/no-empty-function": "off"
-    }
+const obsidianRecommended = obsidianmd.configs.recommended.map((config) => {
+  if (config.files || !config.rules) {
+    return config;
   }
+
+  const hasObsidianRules = Object.keys(config.rules).some((rule) => rule.startsWith("obsidianmd/"));
+  return hasObsidianRules
+    ? { ...config, files: ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx"] }
+    : config;
+});
+
+const brands = [
+  ...DEFAULT_BRANDS,
+  "Dataview",
+  "Jellyfin",
+  "Movie of the Night",
+  "Streaming Availability API",
 ];
+
+export default tseslint.config(
+  {
+    languageOptions: {
+      globals: {
+        ...globals.browser,
+      },
+      parserOptions: {
+        projectService: {
+          allowDefaultProject: [
+            "eslint.config.mjs",
+            "manifest.json",
+          ],
+        },
+        tsconfigRootDir: import.meta.dirname,
+        extraFileExtensions: [".json"],
+      },
+    },
+  },
+  ...obsidianRecommended,
+  {
+    rules: {
+      "obsidianmd/ui/sentence-case": ["error", {
+        brands,
+        acronyms: ["API", "ID", "TMDB", "TV", "URL"],
+        enforceCamelCaseLower: true,
+      }],
+    },
+  },
+  globalIgnores([
+    "node_modules",
+    "dist",
+    "esbuild.config.mjs",
+    "eslint.config.mjs",
+    "version-bump.mjs",
+    "versions.json",
+    "main.js",
+  ]),
+);
