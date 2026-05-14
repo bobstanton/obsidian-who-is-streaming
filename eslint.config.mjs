@@ -15,12 +15,16 @@ const obsidianRecommended = obsidianmd.configs.recommended.map((config) => {
     : config;
 });
 
-const brands = [
-  ...DEFAULT_BRANDS,
+const pluginBrands = [
   "Dataview",
   "Jellyfin",
   "Movie of the Night",
   "Streaming Availability API",
+];
+
+const brands = [
+  ...DEFAULT_BRANDS,
+  ...pluginBrands.filter((brand) => !DEFAULT_BRANDS.includes(brand)),
 ];
 
 export default tseslint.config(

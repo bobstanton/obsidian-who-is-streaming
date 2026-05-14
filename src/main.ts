@@ -49,14 +49,19 @@ export default class WhoIsStreamingPlugin extends Plugin {
     this.addCommand({ id: "refresh", name: "Refresh", editorCallback: async (editor: Editor, view: MarkdownView) => {
         await this.refreshActiveFile();
     }});
-    this.addCommand({ id: "bulk-refresh", name: "Bulk refresh", callback: async () => {
+    const hasDataview = isDataviewPluginEnabled(this.app);
+    if (hasDataview) {
+      this.addCommand({ id: "bulk-refresh", name: "Bulk refresh", callback: async () => {
         await this.refreshAllFiles();
-    }});
+      }});
+    }
 
     if (this.settings.jellyfinInstances && this.settings.jellyfinInstances.length > 0) {
-      this.addCommand({ id: "bulk-refresh-jellyfin", name: "Bulk refresh Jellyfin", callback: async () => {
+      if (hasDataview) {
+        this.addCommand({ id: "bulk-refresh-jellyfin", name: "Bulk refresh Jellyfin", callback: async () => {
           await this.syncJellyfinForAllFiles();
-      }});
+        }});
+      }
       this.addCommand({ id: "sync-jellyfin", name: "Sync Jellyfin", editorCallback: async (editor: Editor, view: MarkdownView) => {
           await this.syncJellyfinActiveFile();
       }});
@@ -185,26 +190,11 @@ export default class WhoIsStreamingPlugin extends Plugin {
       return;
     }
 
-    const findingNotice = new Notice("🔄 Finding files with TMDB ID...", 0);
-
-    const allFiles = this.app.vault.getMarkdownFiles();
-    const filesWithTmdbId: TFile[] = [];
-
-    for (const file of allFiles) {
-      const [tmdb_id] = await this.getTmdbId(file);
-      if (tmdb_id) {
-        filesWithTmdbId.push(file);
-      }
-    }
-
-    findingNotice.hide();
-
-    if (filesWithTmdbId.length === 0) {
-      new Notice("No files with TMDB ID found");
+    const files = await this.getFilesToSync();
+    if (files.length === 0) {
+      new Notice("No files to sync");
       return;
     }
-
-    const files = filesWithTmdbId;
 
     await this.runBulkOperation(files, "⚠️ Bulk Jellyfin refresh cancelled by user", async (file) => {
       const [tmdb_id, showType] = await this.getTmdbId(file);
@@ -306,16 +296,23 @@ export default class WhoIsStreamingPlugin extends Plugin {
   }
 
   async getFilesToSync(): Promise<TFile[]> {
-    if (!isDataviewPluginEnabled(this.app) || this.settings.bulkSyncDataviewQuery.length === 0) {
-      return this.app.vault.getMarkdownFiles();
+    if (!isDataviewPluginEnabled(this.app)) {
+      new Notice("Enable Dataview to use bulk refresh.");
+      return [];
     }
 
     const dataview = getDataviewApi<DataviewValue>(this.app);
     if (!dataview) {
-      return this.app.vault.getMarkdownFiles();
+      new Notice("Dataview is unavailable. Reload Obsidian and try again.");
+      return [];
     }
 
-    let dataviewQuery = this.settings.bulkSyncDataviewQuery;
+    let dataviewQuery = this.settings.bulkSyncDataviewQuery.trim();
+    if (dataviewQuery.length === 0) {
+      new Notice("Set a Dataview query before using bulk refresh.");
+      return [];
+    }
+
     if (!dataviewQuery.startsWith("LIST")) {
       dataviewQuery = "LIST \n" + dataviewQuery;
     }

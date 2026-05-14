@@ -24,17 +24,18 @@ https://github.com/user-attachments/assets/ab89ea54-b529-49e0-aa6a-15a6ee7679ca
 
 This plugin makes the following network requests:
 
-| URL | Purpose | When | Initiated by |
-| --- | ------- | ---- | ------------ |
-| Streaming Availability API by Movie of the Night | Search movies and TV shows, fetch availability by TMDB ID, and load the supported country list | Searches, note refreshes, syncs, and settings views that need country data | The plugin calls the `streaming-availability` client, which sends the request |
-| User-configured Jellyfin server URL | Search Jellyfin libraries for matching movies or series and read watched status for a configured user | Jellyfin sync commands and show syncs with Jellyfin enabled | This plugin's source code, using Obsidian `requestUrl` |
-| Poster image URLs returned by the Streaming Availability API | Download poster images into the vault when local poster saving is enabled | Show syncs where the poster file is missing | This plugin's source code, using Obsidian `requestUrl` |
-| `https://www.movieofthenight.com/about/api` and RapidAPI documentation/pricing pages | Open API documentation and signup pages | User clicks from settings or README links | Obsidian/browser link handling |
+| Package | URL | Purpose |
+| ------- | --- | ------- |
+| `streaming-availability` | Streaming Availability API by Movie of the Night | Search movies and TV shows, fetch availability by TMDB ID, and load supported countries. |
+| Who Is Streaming | User-configured Jellyfin server URL | Search Jellyfin libraries for matching shows and read watched status. |
+| Who Is Streaming | Poster image URLs returned by the Streaming Availability API | Download poster images into the vault when local poster saving is enabled. |
 
 
 ## Dependencies
 
-| Package | Description |
-| ------- | ----------- |
-| [streaming-availability](https://www.npmjs.com/package/streaming-availability) | Calls the Streaming Availability API by Movie of the Night |
-| [he](https://github.com/mathiasbynens/he) | Decodes HTML entities in movie and show metadata |
+| Package                                                                        | Description                                                  |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------------ |
+| [streaming-availability](https://www.npmjs.com/package/streaming-availability) | Calls the Streaming Availability API by Movie of the Night   |
+| [he](https://github.com/mathiasbynens/he)                                      | Decodes HTML entities in movie and show metadata             |
+| [Dataview](https://blacksmithgu.github.io/obsidian-dataview/)                  | Optional. Used for bulk refresh features                     |
+

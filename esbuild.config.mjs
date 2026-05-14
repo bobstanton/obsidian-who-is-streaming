@@ -15,6 +15,9 @@ const context = await esbuild.context({
 	banner: {
 		js: banner,
 	},
+	alias: {
+		"streaming-availability": "./node_modules/streaming-availability/src/index.ts",
+	},
 	entryPoints: ["src/main.ts"],
 	bundle: true,
 	external: [

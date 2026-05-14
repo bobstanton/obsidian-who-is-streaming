@@ -30,9 +30,13 @@ jobs:
                       main.js
                       manifest.json
                       styles.css
+            - name: Generate Release Notes
+              run: |
+                  git log -1 --pretty=%B > release-notes.md
             - name: Create Release
               # https://github.com/ncipollo/release-action
               uses: ncipollo/release-action@v1.20.0
               with:
                   artifacts: "main.js,manifest.json,styles.css"
+                  bodyFile: release-notes.md
                   token: ${{ secrets.GITHUB_TOKEN }}
