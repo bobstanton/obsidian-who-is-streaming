@@ -1,67 +1,58 @@
-import tseslint from "typescript-eslint";
+import { defineConfig, globalIgnores } from "eslint/config";
 import obsidianmd from "eslint-plugin-obsidianmd";
+import { DEFAULT_ACRONYMS } from "eslint-plugin-obsidianmd/dist/lib/rules/ui/acronyms.js";
 import { DEFAULT_BRANDS } from "eslint-plugin-obsidianmd/dist/lib/rules/ui/brands.js";
-import globals from "globals";
-import { globalIgnores } from "eslint/config";
+import tseslint from "typescript-eslint";
 
-const obsidianRecommended = obsidianmd.configs.recommended.map((config) => {
-  if (config.files || !config.rules) {
-    return config;
-  }
-
-  const hasObsidianRules = Object.keys(config.rules).some((rule) => rule.startsWith("obsidianmd/"));
-  return hasObsidianRules
-    ? { ...config, files: ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx"] }
-    : config;
-});
-
-const pluginBrands = [
-  "Dataview",
-  "Jellyfin",
-  "Movie of the Night",
-  "Streaming Availability API",
+const TYPE_AWARE_RULES = [
+  "obsidianmd/no-plugin-as-component",
+  "obsidianmd/no-unsupported-api",
+  "obsidianmd/no-view-references-in-plugin",
+  "obsidianmd/prefer-create-el",
+  "obsidianmd/prefer-file-manager-trash-file",
+  "obsidianmd/prefer-instanceof",
 ];
 
-const brands = [
-  ...DEFAULT_BRANDS,
-  ...pluginBrands.filter((brand) => !DEFAULT_BRANDS.includes(brand)),
-];
-
-export default tseslint.config(
+export default defineConfig([
+  globalIgnores([
+    "main.js",
+    "esbuild.config.mjs",
+    "eslint.config.mjs",
+    "version-bump.mjs",
+  ]),
+  ...obsidianmd.configs.recommended,
   {
+    files: ["manifest.json"],
     languageOptions: {
-      globals: {
-        ...globals.browser,
-      },
+      parser: tseslint.parser,
       parserOptions: {
-        projectService: {
-          allowDefaultProject: [
-            "eslint.config.mjs",
-            "manifest.json",
-          ],
-        },
+        projectService: { allowDefaultProject: ["manifest.json"] },
         tsconfigRootDir: import.meta.dirname,
         extraFileExtensions: [".json"],
       },
     },
   },
-  ...obsidianRecommended,
+  {
+    files: ["**/*.ts"],
+    languageOptions: {
+      parser: tseslint.parser,
+      parserOptions: {
+        project: "./tsconfig.json",
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+  },
+  {
+    files: ["package.json"],
+    rules: Object.fromEntries(TYPE_AWARE_RULES.map((rule) => [rule, "off"])),
+  },
   {
     rules: {
       "obsidianmd/ui/sentence-case": ["error", {
-        brands,
-        acronyms: ["API", "ID", "TMDB", "TV", "URL"],
+        brands: [...DEFAULT_BRANDS, "Jellyfin", "Movie of the Night", "Streaming Availability API"],
+        acronyms: [...DEFAULT_ACRONYMS, "TMDB", "TV"],
         enforceCamelCaseLower: true,
       }],
     },
   },
-  globalIgnores([
-    "node_modules",
-    "dist",
-    "esbuild.config.mjs",
-    "eslint.config.mjs",
-    "version-bump.mjs",
-    "versions.json",
-    "main.js",
-  ]),
-);
+]);

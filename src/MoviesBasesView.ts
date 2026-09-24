@@ -1,4 +1,4 @@
-import { BasesEntry, BasesView, Keymap, QueryController, setIcon } from "obsidian";
+import { BasesEntry, BasesView, Keymap, QueryController, TFile, setIcon } from "obsidian";
 import WhoIsStreamingPlugin from "./main";
 import {
     getFrontmatterString,
@@ -41,12 +41,23 @@ export class MoviesBasesView extends BasesView {
         this.scrollEl = scrollEl;
         this.plugin = plugin;
         this.containerEl = scrollEl.createDiv({ cls: "who-is-streaming-bases-view" });
+        this.plugin.registerMoviesView(this);
     }
 
     onload(): void {
     }
 
     onunload(): void {
+        this.plugin.unregisterMoviesView(this);
+    }
+
+    public getDisplayedFiles(): TFile[] {
+        if (!this.data) return [];
+
+        return this.data.data
+            .filter(entry => this.hasTmdbId(entry))
+            .map(entry => entry.file)
+            .filter(file => file.extension === "md");
     }
 
     public focus(): void {
@@ -73,6 +84,10 @@ export class MoviesBasesView extends BasesView {
         return cache?.frontmatter || {};
     }
 
+    private hasTmdbId(entry: BasesEntry): boolean {
+        return this.getFrontmatter(entry)["tmdb_id"] != null;
+    }
+
     private render(): void {
         this.containerEl.empty();
 
@@ -84,10 +99,7 @@ export class MoviesBasesView extends BasesView {
             return;
         }
 
-        const filteredEntries = this.data.data.filter(entry => {
-            const fm = this.getFrontmatter(entry);
-            return fm["tmdb_id"] != null;
-        });
+        const filteredEntries = this.data.data.filter(entry => this.hasTmdbId(entry));
 
         if (filteredEntries.length === 0) {
             this.containerEl.createDiv({

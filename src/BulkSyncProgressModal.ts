@@ -90,7 +90,7 @@ export class BulkSyncProgressModal extends Modal {
 
     this.errorsEl.createEl("h4", { text: "Errors:", cls: "progress-error-header" });
 
-    const errorList = this.errorsEl.createEl("div", { cls: "progress-error-list" });
+    const errorList = this.errorsEl.createDiv({ cls: "progress-error-list" });
 
     const errorGroups = new Map<string, string[]>();
     this.errors.forEach(({ file, error }) => {

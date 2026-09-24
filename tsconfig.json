@@ -1,5 +1,7 @@
 {
   "compilerOptions": {
+    "noEmit": true,
+    "skipLibCheck": true,
     "baseUrl": ".",
     "inlineSourceMap": true,
     "inlineSources": true,
@@ -8,8 +10,8 @@
     "allowJs": true,
     "noImplicitAny": true,
     "moduleResolution": "node",
-    "importHelpers": true,
     "isolatedModules": true,
+    "esModuleInterop": true,
 	"strictNullChecks": true,
     "lib": [
       "DOM",

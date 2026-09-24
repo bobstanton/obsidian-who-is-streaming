@@ -1,4 +1,4 @@
-import { Editor, MarkdownView, Notice, Plugin, TFile, normalizePath, requestUrl } from "obsidian";
+import { Editor, ItemView, MarkdownView, Notice, Plugin, TFile, normalizePath, requestUrl } from "obsidian";
 import { ShowType, Show } from "streaming-availability";
 import { WhoIsStreamingSettingsTab } from "./WhoIsStreamingSettingsTab";
 import { ShowSelectModal } from "./ShowSelectModal";
@@ -7,18 +7,15 @@ import { BulkSyncProgressModal } from "./BulkSyncProgressModal";
 import StreamingAvailabilityApiService from "./StreamingAvailabilityApiService";
 import JellyfinApiService, { JellyfinAvailability } from "./JellyfinApiService";
 import { MoviesBasesView, MoviesViewType } from "./MoviesBasesView";
-import { WhoIsStreamingSettings, DEFAULT_SETTINGS } from "./settings";
-import { getDataviewApi, isDataviewPluginEnabled } from "./dataviewApi";
+import { WhoIsStreamingSettings, DEFAULT_SETTINGS, JellyfinInstance, isJellyfinInstanceComplete } from "./settings";
 import { applyShowTemplate, buildJellyfinSyncFields, buildSyncFields, getEnabledSyncFields, getTmdbId, isSyncFieldEnabled } from "./syncFields";
-
-interface DataviewValue {
-  path: string;
-}
+import { parseLastSynced } from "./lastSynced";
 
 export default class WhoIsStreamingPlugin extends Plugin {
   settings: WhoIsStreamingSettings;
   streamingAvailabilityApi: StreamingAvailabilityApiService;
   jellyfinApiService: JellyfinApiService;
+  private moviesViews = new Set<MoviesBasesView>();
 
   async onload() {
     await this.loadSettings();
@@ -49,27 +46,66 @@ export default class WhoIsStreamingPlugin extends Plugin {
     this.addCommand({ id: "refresh", name: "Refresh", editorCallback: async (editor: Editor, view: MarkdownView) => {
         await this.refreshActiveFile();
     }});
-    const hasDataview = isDataviewPluginEnabled(this.app);
-    if (hasDataview) {
-      this.addCommand({ id: "bulk-refresh", name: "Bulk refresh", callback: async () => {
-        await this.refreshAllFiles();
-      }});
-    }
+    this.addCommand({ id: "bulk-refresh", name: "Bulk refresh", checkCallback: (checking: boolean) => {
+      const view = this.getActiveMoviesView();
+      if (!view) return false;
 
-    if (this.settings.jellyfinInstances && this.settings.jellyfinInstances.length > 0) {
-      if (hasDataview) {
-        this.addCommand({ id: "bulk-refresh-jellyfin", name: "Bulk refresh Jellyfin", callback: async () => {
-          await this.syncJellyfinForAllFiles();
-        }});
+      if (!checking) {
+        void this.refreshAllFiles(view);
       }
-      this.addCommand({ id: "sync-jellyfin", name: "Sync Jellyfin", editorCallback: async (editor: Editor, view: MarkdownView) => {
-          await this.syncJellyfinActiveFile();
-      }});
-    }
+      return true;
+    }});
+
+    this.addCommand({ id: "bulk-refresh-jellyfin", name: "Bulk refresh Jellyfin", checkCallback: (checking: boolean) => {
+      if (this.getJellyfinInstances().length === 0) return false;
+
+      if (!checking) {
+        void this.syncJellyfinForAllFiles();
+      }
+      return true;
+    }});
+
+    this.addCommand({ id: "sync-jellyfin", name: "Sync Jellyfin", editorCheckCallback: (checking: boolean) => {
+      if (this.getJellyfinInstances().length === 0) return false;
+
+      if (!checking) {
+        void this.syncJellyfinActiveFile();
+      }
+      return true;
+    }});
   }
 
   onunload() {
     this.jellyfinApiService.clearCache();
+  }
+
+  /**
+   * Jellyfin instances that are complete enough to query. Instances still being
+   * filled in from the settings tab are skipped.
+   */
+  getJellyfinInstances(): JellyfinInstance[] {
+    return this.settings.jellyfinInstances.filter(isJellyfinInstanceComplete);
+  }
+
+  registerMoviesView(view: MoviesBasesView): void {
+    this.moviesViews.add(view);
+  }
+
+  unregisterMoviesView(view: MoviesBasesView): void {
+    this.moviesViews.delete(view);
+  }
+
+  getActiveMoviesView(): MoviesBasesView | null {
+    const activeView = this.app.workspace.getActiveViewOfType(ItemView);
+    if (!activeView) return null;
+
+    for (const view of this.moviesViews) {
+      if (activeView.containerEl.contains(view.containerEl) && view.containerEl.isShown()) {
+        return view;
+      }
+    }
+
+    return null;
   }
 
   async searchActiveFile() {
@@ -157,18 +193,22 @@ export default class WhoIsStreamingPlugin extends Plugin {
     }
   }
 
-  async refreshAllFiles() {
+  async refreshAllFiles(view: MoviesBasesView) {
     if (!this.streamingAvailabilityApi.validateApiKey()) {
       return;
     }
 
-    const files = await this.getFilesToSync();
+    const files = this.getFilesToSync(view);
     if (files.length === 0) {
-      new Notice("No files to sync");
       return;
     }
 
-    await this.runBulkOperation(files, "⚠️ Bulk refresh cancelled by user", async (file) => {
+    const filesToRefresh = this.orderForBulkRefresh(files);
+    if (filesToRefresh.length < files.length) {
+      new Notice(`Refreshing the ${filesToRefresh.length} least recently synced of ${files.length} notes`);
+    }
+
+    await this.runBulkOperation(filesToRefresh, "⚠️ Bulk refresh cancelled by user", async (file) => {
       const [tmdb_id, showType] = await this.getTmdbId(file);
       if (!tmdb_id || !showType) {
         return "No TMDB id found";
@@ -185,14 +225,14 @@ export default class WhoIsStreamingPlugin extends Plugin {
   }
 
   async syncJellyfinForAllFiles() {
-    if (this.settings.jellyfinInstances.length === 0) {
+    if (this.getJellyfinInstances().length === 0) {
       new Notice("No Jellyfin instances configured");
       return;
     }
 
-    const files = await this.getFilesToSync();
+    const files = this.getShowFiles();
     if (files.length === 0) {
-      new Notice("No files to sync");
+      new Notice("No notes with a TMDB ID found");
       return;
     }
 
@@ -248,7 +288,7 @@ export default class WhoIsStreamingPlugin extends Plugin {
   }
 
   async syncJellyfinActiveFile() {
-    if (this.settings.jellyfinInstances.length === 0) {
+    if (this.getJellyfinInstances().length === 0) {
       new Notice("No Jellyfin instances configured");
       return;
     }
@@ -280,7 +320,7 @@ export default class WhoIsStreamingPlugin extends Plugin {
 
   async syncJellyfinFrontmatter(file: TFile, tmdbId: number, showType: ShowType): Promise<void> {
     const jellyfinAvailability = await this.jellyfinApiService.checkAvailability(
-      this.settings.jellyfinInstances,
+      this.getJellyfinInstances(),
       tmdbId,
       showType === "movie" ? "movie" : "series"
     );
@@ -295,41 +335,32 @@ export default class WhoIsStreamingPlugin extends Plugin {
     });
   }
 
-  async getFilesToSync(): Promise<TFile[]> {
-    if (!isDataviewPluginEnabled(this.app)) {
-      new Notice("Enable Dataview to use bulk refresh.");
-      return [];
+  orderForBulkRefresh(files: TFile[]): TFile[] {
+    const ordered = [...files].sort((lv, rv) => this.getLastSyncedTime(lv) - this.getLastSyncedTime(rv));
+    const limit = this.settings.bulkRefreshLimit;
+
+    return limit > 0 ? ordered.slice(0, limit) : ordered;
+  }
+
+  private getLastSyncedTime(file: TFile): number {
+    const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter;
+    return parseLastSynced(frontmatter?.["Last Synced"]) ?? Number.MIN_SAFE_INTEGER;
+  }
+
+  getShowFiles(): TFile[] {
+    return this.app.vault.getMarkdownFiles().filter((file) =>
+      this.app.metadataCache.getFileCache(file)?.frontmatter?.["tmdb_id"] != null
+    );
+  }
+
+  getFilesToSync(view: MoviesBasesView): TFile[] {
+    const files = view.getDisplayedFiles();
+
+    if (files.length === 0) {
+      new Notice("No notes with a TMDB ID in this base");
     }
 
-    const dataview = getDataviewApi<DataviewValue>(this.app);
-    if (!dataview) {
-      new Notice("Dataview is unavailable. Reload Obsidian and try again.");
-      return [];
-    }
-
-    let dataviewQuery = this.settings.bulkSyncDataviewQuery.trim();
-    if (dataviewQuery.length === 0) {
-      new Notice("Set a Dataview query before using bulk refresh.");
-      return [];
-    }
-
-    if (!dataviewQuery.startsWith("LIST")) {
-      dataviewQuery = "LIST \n" + dataviewQuery;
-    }
-
-    const results = await dataview.query(dataviewQuery);
-
-    if (!results.successful) {
-      new Notice("Dataview query failed. Check the bulk refresh query in settings.");
-      return [];
-    } else if (results.value.values.length === 0) {
-      new Notice("No files matched the Dataview query in settings");
-      return [];
-    }
-
-    return results.value.values.map((value: DataviewValue) =>
-      this.app.vault.getFileByPath(normalizePath(value.path))
-    ).filter((file): file is TFile => file !== null);
+    return files;
   }
 
   async syncFileWithShow(file: TFile, selectedShow: Show, isBulkSync: boolean = false): Promise<void> {
@@ -374,7 +405,7 @@ export default class WhoIsStreamingPlugin extends Plugin {
 
     const tmdbId = getTmdbId(selectedShow);
     const jellyfinAvailability = await this.jellyfinApiService.checkAvailability(
-      this.settings.jellyfinInstances,
+      this.getJellyfinInstances(),
       parseInt(tmdbId),
       selectedShow.showType === "movie" ? "movie" : "series"
     );

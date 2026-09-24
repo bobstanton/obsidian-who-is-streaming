@@ -2,6 +2,7 @@ import { Show } from "streaming-availability";
 import { decode } from "he";
 import { WhoIsStreamingSettings } from "./settings";
 import { JellyfinAvailability } from "./JellyfinApiService";
+import { formatLastSynced } from "./lastSynced";
 
 interface StreamingService {
   service: { id: string };
@@ -137,7 +138,7 @@ export function buildSyncFields(
     fields.push({ name: "Watched", value: true, alwaysSync: true, showInPreview: false });
   }
 
-  fields.push({ name: "Last Synced", value: new Date().toLocaleString(), alwaysSync: true, showInPreview: false });
+  fields.push({ name: "Last Synced", value: formatLastSynced(new Date()), alwaysSync: true, showInPreview: false });
 
   return fields.filter((field) => field.value !== null && field.value !== undefined && field.value !== "");
 }

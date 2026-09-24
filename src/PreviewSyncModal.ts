@@ -1,4 +1,4 @@
-import { App, Modal } from "obsidian";
+import { App, Modal, Setting } from "obsidian";
 import { Show } from "streaming-availability";
 import { WhoIsStreamingSettings } from "./settings";
 import { applyShowTemplate, buildSyncFields, getEnabledSyncFields, isSyncFieldEnabled, SyncField } from "./syncFields";
@@ -129,7 +129,7 @@ export class PreviewSyncModal extends Modal {
     contentEl.empty();
     contentEl.addClass("who-is-streaming-preview-modal");
 
-    contentEl.createEl("h2", { text: "Preview changes" });
+    this.setTitle("Preview changes");
 
     if (this.show.imageSet?.verticalPoster?.w240) {
       const posterDiv = contentEl.createDiv({ cls: "preview-poster" });
@@ -192,12 +192,12 @@ export class PreviewSyncModal extends Modal {
           }
           posterPreview.createDiv({ text: change.newValue, cls: "preview-poster-url" });
         } else {
-          changeDetails.createEl("span", {
+          changeDetails.createSpan({
             text: change.oldValue,
             cls: "preview-old-value",
           });
-          changeDetails.createEl("span", { text: " → ", cls: "preview-arrow" });
-          changeDetails.createEl("span", {
+          changeDetails.createSpan({ text: " → ", cls: "preview-arrow" });
+          changeDetails.createSpan({
             text: change.newValue,
             cls: "preview-new-value",
           });
@@ -205,21 +205,24 @@ export class PreviewSyncModal extends Modal {
       });
     }
 
-    const buttonContainer = contentEl.createDiv({ cls: "who-is-streaming-modal-button-container" });
-
-    const cancelBtn = buttonContainer.createEl("button");
-    cancelBtn.setText("Cancel");
-    cancelBtn.addEventListener("click", () => {
-      this.callback(false);
-      this.close();
-    });
-
-    const syncBtn = buttonContainer.createEl("button", { cls: "mod-cta" });
-    syncBtn.setText("Sync");
-    syncBtn.addEventListener("click", () => {
-      this.callback(true, this.getEnabledFields());
-      this.close();
-    });
+    new Setting(contentEl)
+      .addButton((button) => {
+        button
+          .setButtonText("Cancel")
+          .onClick(() => {
+            this.callback(false);
+            this.close();
+          });
+      })
+      .addButton((button) => {
+        button
+          .setButtonText("Sync")
+          .setCta()
+          .onClick(() => {
+            this.callback(true, this.getEnabledFields());
+            this.close();
+          });
+      });
   }
 
   onClose() {

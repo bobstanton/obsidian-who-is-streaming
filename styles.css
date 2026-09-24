@@ -211,27 +211,6 @@
   padding: 8px 24px;
 }
 
-.who-is-streaming-textarea textarea {
-  min-height: 100px;
-  font-family: var(--font-monospace);
-}
-
-.setting-item.who-is-streaming-textarea {
-  align-items: flex-start;
-}
-
-.setting-item.who-is-streaming-textarea .setting-item-info {
-  padding-top: 6px;
-}
-
-.setting-item.who-is-streaming-textarea .setting-item-control {
-  min-width: 40%;
-}
-
-.setting-item.who-is-streaming-textarea .setting-item-control textarea {
-  width: 100%;
-}
-
 @media (max-width: 768px) {
   .modal {
     max-width: 95vw;
@@ -281,15 +260,6 @@
     width: 95vw;
     padding: 16px;
   }
-
-  .who-is-streaming-controls {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .who-is-streaming-controls .search-input {
-    min-width: 100%;
-  }
 }
 
 @media (hover: none) and (pointer: coarse) {
@@ -301,13 +271,6 @@
   button {
     min-height: 44px;
     padding: 12px 20px;
-  }
-
-  .who-is-streaming-textarea .setting-item-control {
-    min-width: 50px;
-    min-height: 44px;
-    display: flex;
-    align-items: center;
   }
 }
 
@@ -329,100 +292,11 @@
   outline-offset: 2px;
 }
 
-/* === Codeblock View === */
-.who-is-streaming-codeblock {
-  margin: 20px 0;
-}
-
-.who-is-streaming-error {
-  padding: 16px;
-  background: var(--background-modifier-error);
-  border-radius: 4px;
-  color: var(--text-error);
-  text-align: center;
-}
-
 .who-is-streaming-empty {
   padding: 40px;
   text-align: center;
   color: var(--text-muted);
   font-size: 1.1em;
-}
-
-.who-is-streaming-controls {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  margin-bottom: 0;
-  padding: 12px;
-  background: var(--background-secondary);
-  border-radius: 6px;
-  flex-wrap: wrap;
-}
-
-.who-is-streaming-controls .view-toggle {
-  display: flex;
-  gap: 4px;
-  border-radius: 4px;
-  padding: 2px;
-}
-
-.who-is-streaming-controls .view-toggle button {
-  padding: 6px 16px;
-  border: none;
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  border-radius: 3px;
-  transition: all 0.2s;
-  font-size: 0.9em;
-}
-
-.who-is-streaming-controls .view-toggle button:hover {
-  background: var(--background-modifier-hover);
-  color: var(--text-normal);
-}
-
-.who-is-streaming-controls .view-toggle button.active {
-  background: var(--interactive-accent);
-  color: var(--text-on-accent);
-}
-
-.who-is-streaming-controls .search-input {
-  flex: 1;
-  min-width: 200px;
-  padding: 6px 12px;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 4px;
-  background: var(--background-primary);
-  color: var(--text-normal);
-  font-size: 0.9em;
-}
-
-.who-is-streaming-controls .search-input:focus {
-  outline: none;
-  border-color: var(--interactive-accent);
-}
-
-.who-is-streaming-controls .sort-select {
-  padding: 6px 12px;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 4px;
-  background: var(--background-primary);
-  color: var(--text-normal);
-  cursor: pointer;
-  font-size: 0.9em;
-}
-
-.who-is-streaming-controls .sort-select:focus {
-  outline: none;
-  border-color: var(--interactive-accent);
-}
-
-.who-is-streaming-controls .result-count {
-  font-size: 0.9em;
-  color: var(--text-muted);
-  white-space: nowrap;
 }
 
 .who-is-streaming-results {
@@ -723,45 +597,6 @@
   width: 14px;
   height: 14px;
   color: white;
-}
-
-/* === Settings Modals === */
-.folder-selection-list {
-  max-height: 400px;
-  overflow-y: auto;
-  margin-top: 10px;
-}
-
-.folder-selection-item {
-  padding: 8px;
-  cursor: pointer;
-  border-radius: 4px;
-}
-
-.folder-selection-item:hover {
-  background-color: var(--background-modifier-hover);
-}
-
-.who-is-streaming-modal-button-container {
-  margin-top: 20px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--size-4-2);
-  justify-content: flex-end;
-  align-items: center;
-}
-
-.who-is-streaming-setting-description {
-  color: var(--text-muted);
-  font-size: var(--font-ui-smaller);
-  line-height: var(--line-height-tight);
-}
-
-.jellyfin-modal-buttons {
-  margin-top: 20px;
-  display: flex;
-  gap: 10px;
-  justify-content: flex-end;
 }
 
 /* === Progress Modal Error Display === */

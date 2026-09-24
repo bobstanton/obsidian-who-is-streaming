@@ -33,6 +33,12 @@ export interface JellyfinInstance {
   userId: string;
 }
 
+export function isJellyfinInstanceComplete(instance: JellyfinInstance): boolean {
+  return instance.name.trim().length > 0
+    && instance.url.trim().length > 0
+    && instance.apiKey.trim().length > 0;
+}
+
 export interface WhoIsStreamingSettings {
   /**
    * API key used for accessing streaming service data.
@@ -63,11 +69,6 @@ export interface WhoIsStreamingSettings {
    * Format to use when a note is being renamed (for TV series).
    */
   noteNameFormatSeries: string;
-
-  /**
-   * Dataview query to execute when bulk refreshing shows
-   */
-  bulkSyncDataviewQuery: string;
 
   /**
    * The streaming services to sync with.
@@ -105,6 +106,8 @@ export interface WhoIsStreamingSettings {
    */
   jellyfinInstances: JellyfinInstance[];
 
+  bulkRefreshLimit: number;
+
   /**
    * Rate limit warning threshold (percentage, 0-100).
    * Shows a warning when API quota usage reaches this percentage.
@@ -141,7 +144,6 @@ export const DEFAULT_SETTINGS: WhoIsStreamingSettings = {
   countriesCacheAsOf: new Date(0),
   noteNameFormat: "${title} (${year})",
   noteNameFormatSeries: "${title} (${firstAirYear}-${lastAirYear})",
-  bulkSyncDataviewQuery: "WHERE tmdb_id AND date(now) - date(last-synced, \"D, tt\") > dur(30 days)\nSORT date(last-synced, \"D, tt\") ASC\nLIMIT 10",
   streamingServicesToSync: {},
   posterMode: "remote",
   posterFolder: "posters",
@@ -149,6 +151,7 @@ export const DEFAULT_SETTINGS: WhoIsStreamingSettings = {
   showPreviewDialog: true,
   gridPosterSize: 200,
   jellyfinInstances: [],
+  bulkRefreshLimit: 40,
   rateLimitWarningThreshold: 80,
   defaultEnabledFields: [
     "File Name",

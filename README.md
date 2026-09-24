@@ -5,14 +5,14 @@ Discover and document which streaming services a movie is currently available to
 
 ## Usage
 
-An [API Key](https://rapidapi.com/movie-of-the-night-movie-of-the-night-default/api/streaming-availability/pricing) for the Streaming Availability API is required. After signing up for an API Key, enter the key into the settings page, choose your country and select which streaming services you are interested in.
+An [API key](https://www.movieofthenight.com/about/api) for the Streaming Availability API is required. After signing up for an API key, enter the key into the settings page, choose your country and select which streaming services you are interested in.
 
 Then create a new note, enter a movie or TV show as the name of the note, then use the popcorn ribbon button or `Search` command. The title of the note will be used to search the Streaming Availability API. A list of options will be presented to choose from. After syncing a note once, the `Refresh` command can use the `tmdb_id` and `Type` properties to sync directly without the need for a search.
 
 
 ## Cost
 
-The [Streaming Availability API](https://rapidapi.com/movie-of-the-night-movie-of-the-night-default/api/streaming-availability/pricing) offers free and paid tiers.
+The [Streaming Availability API](https://www.movieofthenight.com/about/api/pricing) offers free and paid tiers.
 
 
 ## Demo
@@ -37,5 +37,3 @@ This plugin makes the following network requests:
 | ------------------------------------------------------------------------------ | ------------------------------------------------------------ |
 | [streaming-availability](https://www.npmjs.com/package/streaming-availability) | Calls the Streaming Availability API by Movie of the Night   |
 | [he](https://github.com/mathiasbynens/he)                                      | Decodes HTML entities in movie and show metadata             |
-| [Dataview](https://blacksmithgu.github.io/obsidian-dataview/)                  | Optional. Used for bulk refresh features                     |
-
