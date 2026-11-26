@@ -1,3 +1,10 @@
+:where(.who-is-streaming-bases-view, .who-is-streaming-discover, .who-is-streaming-stats) {
+  --wis-scrim-top: rgba(0, 0, 0, 0.7);
+  --wis-scrim-bottom: rgba(0, 0, 0, 0.95);
+  --wis-on-poster: #ffffff;
+  --wis-on-poster-muted: rgba(255, 255, 255, 0.88);
+}
+
 .who-is-streaming-suggestion {
   padding: 8px 4px;
 }
@@ -18,7 +25,7 @@
 
 .who-is-streaming-suggestion .suggestion-poster {
   overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-s);
 }
 
 .who-is-streaming-suggestion .suggestion-poster img {
@@ -91,7 +98,7 @@
 .who-is-streaming-preview-modal .preview-poster img {
   max-width: 200px;
   border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-s);
 }
 
 .who-is-streaming-preview-modal .preview-subtitle {
@@ -274,19 +281,6 @@
   }
 }
 
-/* === Theme Overrides === */
-.theme-dark .who-is-streaming-suggestion .suggestion-poster {
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
-}
-
-.theme-dark .who-is-streaming-preview-modal .preview-poster img {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
-}
-
-.theme-light .who-is-streaming-preview-modal .preview-poster img {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-}
-
 .who-is-streaming-suggestion:focus-visible {
   outline: 2px solid var(--interactive-accent);
   outline-offset: 2px;
@@ -324,7 +318,7 @@
   padding: 10px 20px;
 }
 
-.movie-poster-item {
+:where(.who-is-streaming-bases-view, .who-is-streaming-discover, .who-is-streaming-stats) .movie-poster-item {
   position: relative;
   cursor: pointer;
   border-radius: 6px;
@@ -333,12 +327,12 @@
   width: 100%;
 }
 
-.movie-poster-item:hover {
+:where(.who-is-streaming-bases-view, .who-is-streaming-discover, .who-is-streaming-stats) .movie-poster-item:hover {
   transform: scale(1.15);
   z-index: 10;
 }
 
-.movie-poster-item .poster-container {
+:where(.who-is-streaming-bases-view, .who-is-streaming-discover, .who-is-streaming-stats) .movie-poster-item .poster-container {
   position: relative;
   border-radius: 6px;
   overflow: visible;
@@ -346,7 +340,7 @@
   aspect-ratio: 2/3;
 }
 
-.movie-poster-item .poster-container::before {
+:where(.who-is-streaming-bases-view, .who-is-streaming-discover, .who-is-streaming-stats) .movie-poster-item .poster-container::before {
   content: '';
   position: absolute;
   top: -5px;
@@ -362,7 +356,7 @@
   pointer-events: none;
 }
 
-.movie-poster-item .poster-container :is(img, > div:not(.watched-checkbox-overlay)) {
+:where(.who-is-streaming-bases-view, .who-is-streaming-discover, .who-is-streaming-stats) .movie-poster-item .poster-container :is(img, > div:not(.watched-checkbox-overlay)) {
   width: 100%;
   height: 100%;
   position: relative;
@@ -370,18 +364,18 @@
   border-radius: 6px;
 }
 
-.movie-poster-item .poster-container img {
+:where(.who-is-streaming-bases-view, .who-is-streaming-discover, .who-is-streaming-stats) .movie-poster-item .poster-container img {
   object-fit: cover;
   display: block;
 }
 
-.movie-poster-item .poster-overlay {
+:where(.who-is-streaming-bases-view, .who-is-streaming-discover, .who-is-streaming-stats) .movie-poster-item .poster-overlay {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  background: linear-gradient(to bottom, rgba(0,0,0,0.7), rgba(0,0,0,0.95));
+  background: linear-gradient(to bottom, var(--wis-scrim-top), var(--wis-scrim-bottom));
   opacity: 0;
   transition: opacity 0.3s;
   display: flex;
@@ -393,17 +387,17 @@
   pointer-events: none;
 }
 
-.movie-poster-item:hover .poster-overlay {
+:where(.who-is-streaming-bases-view, .who-is-streaming-discover, .who-is-streaming-stats) .movie-poster-item:hover .poster-overlay {
   opacity: 1;
   pointer-events: auto;
 }
 
-.movie-poster-item .overlay-content {
+:where(.who-is-streaming-bases-view, .who-is-streaming-discover, .who-is-streaming-stats) .movie-poster-item .overlay-content {
   width: 100%;
-  color: white;
+  color: var(--wis-on-poster);
 }
 
-.movie-card-inner {
+:where(.who-is-streaming-bases-view, .who-is-streaming-discover, .who-is-streaming-stats) .movie-card-inner {
   display: flex;
   gap: 15px;
   padding: 10px;
@@ -412,76 +406,76 @@
   cursor: pointer;
 }
 
-.movie-card-poster {
+:where(.who-is-streaming-bases-view, .who-is-streaming-discover, .who-is-streaming-stats) .movie-card-poster {
   flex-shrink: 0;
   position: relative;
 }
 
-.movie-card-details {
+:where(.who-is-streaming-bases-view, .who-is-streaming-discover, .who-is-streaming-stats) .movie-card-details {
   flex: 1;
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-.movie-card-header {
+:where(.who-is-streaming-bases-view, .who-is-streaming-discover, .who-is-streaming-stats) .movie-card-header {
   display: flex;
   justify-content: space-between;
   align-items: start;
 }
 
-.movie-card-title {
+:where(.who-is-streaming-bases-view, .who-is-streaming-discover, .who-is-streaming-stats) .movie-card-title {
   margin: 0;
   color: var(--text-accent);
 }
 
-.movie-card-year {
+:where(.who-is-streaming-bases-view, .who-is-streaming-discover, .who-is-streaming-stats) .movie-card-year {
   font-size: 0.9em;
   color: var(--text-muted);
 }
 
-.movie-card-overview {
+:where(.who-is-streaming-bases-view, .who-is-streaming-discover, .who-is-streaming-stats) .movie-card-overview {
   font-size: 0.9em;
   color: var(--text-muted);
   line-height: 1.5;
 }
 
-.poster-overlay-title {
+:where(.who-is-streaming-bases-view, .who-is-streaming-discover, .who-is-streaming-stats) .poster-overlay-title {
   margin: 0 0 4px 0;
-  color: white;
+  color: var(--wis-on-poster);
   font-size: 1.1em;
 }
 
-.poster-overlay-meta {
+:where(.who-is-streaming-bases-view, .who-is-streaming-discover, .who-is-streaming-stats) .poster-overlay-meta {
   font-size: 0.85em;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--wis-on-poster-muted);
   margin-bottom: 8px;
 }
 
-.poster-overlay-badges {
+:where(.who-is-streaming-bases-view, .who-is-streaming-discover, .who-is-streaming-stats) .poster-overlay-badges {
   display: flex;
   gap: 4px;
   flex-wrap: wrap;
   margin-bottom: 8px;
 }
 
-.poster-overlay-overview {
+:where(.who-is-streaming-bases-view, .who-is-streaming-discover, .who-is-streaming-stats) .poster-overlay-overview {
   font-size: 0.8em;
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--wis-on-poster-muted);
   line-height: 1.4;
   max-height: 120px;
   overflow-y: auto;
 }
 
-.poster-img-card {
+:where(.who-is-streaming-bases-view, .who-is-streaming-discover, .who-is-streaming-stats) .poster-img-card {
   width: 120px;
   height: 180px;
   object-fit: cover;
   border-radius: 4px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-s);
 }
 
-.poster-img-poster {
+:where(.who-is-streaming-bases-view, .who-is-streaming-discover, .who-is-streaming-stats) .poster-img-poster {
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -492,7 +486,7 @@
 }
 
 /* Shared poster placeholder styles */
-:is(.poster-placeholder-card, .poster-placeholder-poster) {
+:where(.who-is-streaming-bases-view, .who-is-streaming-discover, .who-is-streaming-stats) :is(.poster-placeholder-card, .poster-placeholder-poster) {
   background: var(--background-secondary);
   border: 1px solid var(--background-modifier-border);
   display: flex;
@@ -505,12 +499,12 @@
   overflow: hidden;
 }
 
-:is(.poster-placeholder-card, .poster-placeholder-poster)::before {
+:where(.who-is-streaming-bases-view, .who-is-streaming-discover, .who-is-streaming-stats) :is(.poster-placeholder-card, .poster-placeholder-poster)::before {
   content: '🎬';
   opacity: 0.4;
 }
 
-.poster-placeholder-card {
+:where(.who-is-streaming-bases-view, .who-is-streaming-discover, .who-is-streaming-stats) .poster-placeholder-card {
   width: 120px;
   height: 180px;
   gap: 12px;
@@ -519,11 +513,11 @@
   font-size: 0.85em;
 }
 
-.poster-placeholder-card::before {
+:where(.who-is-streaming-bases-view, .who-is-streaming-discover, .who-is-streaming-stats) .poster-placeholder-card::before {
   font-size: 32px;
 }
 
-.poster-placeholder-poster {
+:where(.who-is-streaming-bases-view, .who-is-streaming-discover, .who-is-streaming-stats) .poster-placeholder-poster {
   width: 100%;
   height: 100%;
   gap: 16px;
@@ -534,37 +528,37 @@
   z-index: 1;
 }
 
-.poster-placeholder-poster::before {
+:where(.who-is-streaming-bases-view, .who-is-streaming-discover, .who-is-streaming-stats) .poster-placeholder-poster::before {
   font-size: 48px;
 }
 
-.movie-metadata {
+:where(.who-is-streaming-bases-view, .who-is-streaming-discover, .who-is-streaming-stats) .movie-metadata {
   font-size: 0.85em;
   color: var(--text-faint);
 }
 
-.movie-genres {
+:where(.who-is-streaming-bases-view, .who-is-streaming-discover, .who-is-streaming-stats) .movie-genres {
   font-size: 0.85em;
   color: var(--text-faint);
   font-style: italic;
 }
 
-.movie-people {
+:where(.who-is-streaming-bases-view, .who-is-streaming-discover, .who-is-streaming-stats) .movie-people {
   font-size: 0.85em;
   color: var(--text-muted);
 }
 
-.streaming-badges {
+:where(.who-is-streaming-bases-view, .who-is-streaming-discover, .who-is-streaming-stats) .streaming-badges {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
   align-items: center;
 }
 
-.streaming-badge {
+:where(.who-is-streaming-bases-view, .who-is-streaming-discover, .who-is-streaming-stats) .streaming-badge {
   padding: 2px 8px;
   background: var(--interactive-accent);
-  color: white;
+  color: var(--text-on-accent);
   border-radius: 3px;
   font-size: 0.85em;
   display: inline-block;
@@ -577,82 +571,82 @@
 }
 
 /* Watched status overlay */
-.movie-card-poster .watched-checkbox-overlay,
-.movie-poster-item .poster-container .watched-checkbox-overlay {
+:where(.who-is-streaming-bases-view, .who-is-streaming-discover, .who-is-streaming-stats) .movie-card-poster .watched-checkbox-overlay,
+:where(.who-is-streaming-bases-view, .who-is-streaming-discover, .who-is-streaming-stats) .movie-poster-item .poster-container .watched-checkbox-overlay {
   position: absolute;
   top: 8px;
   right: 8px;
   width: 20px;
   height: 20px;
-  background: #4a9eff;
+  background: var(--interactive-accent);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-s);
   z-index: 10;
 }
 
-.watched-checkbox-overlay svg {
+:where(.who-is-streaming-bases-view, .who-is-streaming-discover, .who-is-streaming-stats) .watched-checkbox-overlay svg {
   width: 14px;
   height: 14px;
-  color: white;
+  color: var(--text-on-accent);
 }
 
 /* === Progress Modal Error Display === */
-.progress-errors {
+:where(.who-is-streaming-progress-modal) .progress-errors {
   display: block;
 }
 
-.progress-errors.hidden {
+:where(.who-is-streaming-progress-modal) .progress-errors.hidden {
   display: none;
 }
 
-.progress-error-header {
+:where(.who-is-streaming-progress-modal) .progress-error-header {
   margin-top: 16px;
   margin-bottom: 8px;
 }
 
-.progress-error-list {
+:where(.who-is-streaming-progress-modal) .progress-error-list {
   max-height: 200px;
   overflow-y: auto;
   font-size: 0.9em;
 }
 
-.progress-error-item {
+:where(.who-is-streaming-progress-modal) .progress-error-item {
   margin-bottom: 8px;
   padding: 8px;
   background: var(--background-secondary);
   border-radius: 4px;
 }
 
-.progress-error-text {
+:where(.who-is-streaming-progress-modal) .progress-error-text {
   color: var(--text-error);
 }
 
-.progress-error-file-count {
+:where(.who-is-streaming-progress-modal) .progress-error-file-count {
   font-size: 0.85em;
   color: var(--text-muted);
   margin-top: 4px;
 }
 
 /* === Poster Preview in Changes === */
-.preview-poster-change {
+:where(.who-is-streaming-preview-modal) .preview-poster-change {
   display: flex;
   flex-direction: column;
   gap: 8px;
   margin-top: 8px;
 }
 
-.preview-poster-thumbnail {
+:where(.who-is-streaming-preview-modal) .preview-poster-thumbnail {
   max-width: 150px;
   max-height: 225px;
   border-radius: 4px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-s);
   object-fit: cover;
 }
 
-.preview-poster-url {
+:where(.who-is-streaming-preview-modal) .preview-poster-url {
   font-size: 0.85em;
   color: var(--text-muted);
   word-break: break-all;
@@ -662,6 +656,537 @@
   border-radius: 3px;
 }
 
-.theme-dark .preview-poster-thumbnail {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+.who-is-streaming-cast-graph {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 400px;
+  overflow: hidden;
+}
+
+.who-is-streaming-cast-graph canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  cursor: grab;
+}
+
+.who-is-streaming-cast-graph canvas.is-panning {
+  cursor: grabbing;
+}
+
+.who-is-streaming-cast-graph canvas.is-over-node {
+  cursor: pointer;
+}
+
+.who-is-streaming-cast-graph .who-is-streaming-empty {
+  position: absolute;
+  inset: 0;
+}
+
+.who-is-streaming-cast-graph .cast-graph-probe {
+  display: none;
+}
+
+.cast-graph-probe.probe-text { color: var(--text-normal); }
+.cast-graph-probe.probe-muted { color: var(--text-muted); }
+.cast-graph-probe.probe-link { color: var(--background-modifier-border-hover); }
+.cast-graph-probe.probe-background { color: var(--background-primary); }
+.cast-graph-probe.probe-surface { color: var(--background-secondary); }
+.cast-graph-probe.probe-cast { color: var(--interactive-accent); }
+.cast-graph-probe.probe-director { color: var(--color-orange); }
+
+.who-is-streaming-stats {
+  --stats-accent: var(--interactive-accent);
+  --stats-accent-hover: var(--interactive-accent-hover);
+  --stats-empty: var(--background-modifier-border);
+  --stats-unwatched: color-mix(in srgb, var(--text-faint) 60%, var(--background-primary));
+  --stats-unwatched-hover: color-mix(in srgb, var(--text-faint) 80%, var(--background-primary));
+  --stats-segment-gap: 2px;
+  --stats-gap: 12px;
+  --stats-panel-padding: 12px 14px;
+  --stats-panel-radius: var(--radius-m);
+  --stats-bar-height: 10px;
+  --stats-bar-radius: 4px;
+  --stats-column-height: 170px;
+  --stats-cell-size: 11px;
+  --stats-cell-gap: 2px;
+}
+
+:where(.who-is-streaming-stats) {
+  padding: 12px 16px 24px;
+  max-width: 100%;
+}
+
+:where(.who-is-streaming-stats) .stats-notice {
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  border-radius: var(--radius-m);
+  background: var(--background-secondary);
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+}
+
+:where(.who-is-streaming-stats) .stats-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--stats-gap);
+  margin-bottom: var(--stats-gap);
+}
+
+:where(.who-is-streaming-stats) :is(.stats-tile, .stats-panel) {
+  min-width: 0;
+  padding: var(--stats-panel-padding);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--stats-panel-radius);
+  background: var(--background-primary);
+}
+
+:where(.who-is-streaming-stats) :is(.stats-tile-label, .stats-panel-subtitle, .stats-tile-detail) {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+
+:where(.who-is-streaming-stats) .stats-tile-value {
+  color: var(--text-normal);
+  font-size: 1.6em;
+  font-weight: var(--font-semibold);
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+}
+
+:where(.who-is-streaming-stats) .stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
+  gap: var(--stats-gap);
+}
+
+:where(.who-is-streaming-stats) .stats-panel.is-wide {
+  grid-column: 1 / -1;
+}
+
+:where(.who-is-streaming-stats) .stats-panel-title {
+  color: var(--text-normal);
+  font-weight: var(--font-semibold);
+}
+
+:where(.who-is-streaming-stats) .stats-panel-subtitle {
+  margin-bottom: 12px;
+}
+
+:where(.who-is-streaming-stats) .stats-legend {
+  display: flex;
+  gap: 12px;
+  margin: -6px 0 10px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+
+:where(.who-is-streaming-stats) .stats-legend-item {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+}
+
+:where(.who-is-streaming-stats) .stats-legend-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+:where(.who-is-streaming-stats) :is(.stats-legend-swatch, .stats-segment).is-watched {
+  background: var(--stats-accent);
+}
+
+:where(.who-is-streaming-stats) :is(.stats-legend-swatch, .stats-segment).is-unwatched {
+  background: var(--stats-unwatched);
+}
+
+:where(.who-is-streaming-stats) :is(.stats-bar, .stats-column-bar).is-stacked {
+  display: flex;
+  gap: var(--stats-segment-gap);
+  overflow: hidden;
+  background: transparent;
+}
+
+:where(.who-is-streaming-stats) .stats-column-bar.is-stacked {
+  flex-direction: column-reverse;
+}
+
+:where(.who-is-streaming-stats) .stats-segment {
+  flex: var(--stats-share) 1 0;
+  min-width: 0;
+  min-height: 0;
+}
+
+:where(.who-is-streaming-stats) .stats-bar-row:hover .stats-segment.is-watched,
+:where(.who-is-streaming-stats) .stats-column:hover .stats-segment.is-watched,
+:where(.who-is-streaming-stats) .is-active .stats-segment.is-watched {
+  background: var(--stats-accent-hover);
+}
+
+:where(.who-is-streaming-stats) .stats-bar-row:hover .stats-segment.is-unwatched,
+:where(.who-is-streaming-stats) .stats-column:hover .stats-segment.is-unwatched,
+:where(.who-is-streaming-stats) .is-active .stats-segment.is-unwatched {
+  background: var(--stats-unwatched-hover);
+}
+
+:where(.who-is-streaming-stats) .stats-filters {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin: 0 0 var(--stats-gap);
+  padding: 8px 0;
+  background: var(--background-primary);
+  font-size: var(--font-ui-small);
+}
+
+:where(.who-is-streaming-stats) .stats-filters-label {
+  color: var(--text-muted);
+}
+
+:where(.who-is-streaming-stats) .stats-filter-chip {
+  display: inline-flex;
+  gap: 2px;
+  align-items: center;
+  padding: 2px 2px 2px 10px;
+  border-radius: var(--radius-l);
+  background: color-mix(in srgb, var(--stats-accent) 18%, transparent);
+  color: var(--text-normal);
+}
+
+:where(.who-is-streaming-stats) .stats-filter-remove {
+  padding: 2px;
+}
+
+:where(.who-is-streaming-stats) .stats-filters-clear {
+  font-size: var(--font-ui-smaller);
+}
+
+:where(.who-is-streaming-stats) .stats-matches {
+  margin-bottom: var(--stats-gap);
+}
+
+:where(.who-is-streaming-stats) .stats-matches-count {
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+}
+
+:where(.who-is-streaming-stats) .stats-matches .who-is-streaming-results {
+  padding: 8px 0;
+}
+
+:where(.who-is-streaming-stats) .is-clickable {
+  cursor: pointer;
+}
+
+:where(.who-is-streaming-stats) .stats-bar-row.is-clickable:hover .stats-bar-label,
+:where(.who-is-streaming-stats) .stats-bar-row.is-active .stats-bar-label {
+  color: var(--stats-accent);
+}
+
+:where(.who-is-streaming-stats) .stats-bar-row.is-active .stats-bar-label,
+:where(.who-is-streaming-stats) .stats-column.is-active .stats-column-label {
+  font-weight: var(--font-semibold);
+}
+
+:where(.who-is-streaming-stats) .stats-bar-row.is-active .stats-bar:not(.is-stacked),
+:where(.who-is-streaming-stats) .stats-column.is-active .stats-column-bar:not(.is-stacked) {
+  background: var(--stats-accent-hover);
+}
+
+:where(.who-is-streaming-stats) .stats-heatmap-cell.is-clickable:hover,
+:where(.who-is-streaming-stats) .stats-heatmap-cell.is-active {
+  outline: 2px solid var(--stats-accent-hover);
+  outline-offset: 1px;
+}
+
+:where(.who-is-streaming-stats) .is-clickable:focus-visible {
+  outline: 2px solid var(--background-modifier-border-focus);
+  outline-offset: 2px;
+}
+
+:where(.who-is-streaming-stats) .stats-panel-empty {
+  padding: 16px 0;
+  color: var(--text-faint);
+  font-size: var(--font-ui-small);
+}
+
+:where(.who-is-streaming-stats) .stats-bars {
+  display: grid;
+  grid-template-columns: minmax(0, 40%) minmax(0, 1fr) auto;
+  gap: 6px 10px;
+  align-items: center;
+  font-size: var(--font-ui-small);
+}
+
+:where(.who-is-streaming-stats) .stats-bar-row {
+  display: grid;
+  grid-template-columns: subgrid;
+  grid-column: 1 / -1;
+  align-items: center;
+}
+
+:where(.who-is-streaming-stats) .stats-bar-label {
+  overflow: hidden;
+  color: var(--text-normal);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:where(.who-is-streaming-stats) .stats-bar-track {
+  height: var(--stats-bar-height);
+}
+
+:where(.who-is-streaming-stats) .stats-bar {
+  width: var(--stats-size, 0%);
+  min-width: 2px;
+  height: 100%;
+  border-radius: 0 var(--stats-bar-radius) var(--stats-bar-radius) 0;
+  background: var(--stats-accent);
+}
+
+:where(.who-is-streaming-stats) .stats-bar-value {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+:where(.who-is-streaming-stats) .stats-columns-scroller,
+:where(.who-is-streaming-stats) .stats-heatmap-scroller {
+  overflow-x: auto;
+}
+
+:where(.who-is-streaming-stats) .stats-columns {
+  display: flex;
+  gap: 2px;
+  align-items: stretch;
+  height: var(--stats-column-height);
+  border-bottom: 1px solid var(--background-modifier-border);
+  margin-bottom: 20px;
+}
+
+:where(.who-is-streaming-stats) .stats-column {
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-width: 10px;
+}
+
+:where(.who-is-streaming-stats) .stats-column-plot {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  position: relative;
+  min-height: 0;
+  margin-top: 18px;
+}
+
+:where(.who-is-streaming-stats) .stats-column-bar {
+  width: 100%;
+  max-width: 24px;
+  height: var(--stats-size, 0%);
+  min-height: 2px;
+  border-radius: var(--stats-bar-radius) var(--stats-bar-radius) 0 0;
+  background: var(--stats-accent);
+}
+
+:where(.who-is-streaming-stats) .stats-column-bar.is-empty {
+  min-height: 0;
+}
+
+:where(.who-is-streaming-stats) .stats-column:hover .stats-column-bar:not(.is-stacked),
+:where(.who-is-streaming-stats) .stats-bar-row:hover .stats-bar:not(.is-stacked) {
+  background: var(--stats-accent-hover);
+}
+
+:where(.who-is-streaming-stats) .stats-column-value {
+  position: absolute;
+  bottom: calc(var(--stats-size, 0%) + 2px);
+  left: 50%;
+  transform: translateX(-50%);
+  color: var(--text-normal);
+  font-size: var(--font-ui-smaller);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+:where(.who-is-streaming-stats) .stats-column-label {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+
+:where(.who-is-streaming-stats) .stats-column-label.is-hidden {
+  display: none;
+}
+
+:where(.who-is-streaming-stats) .stats-column-label.is-start {
+  left: 0;
+  transform: none;
+}
+
+:where(.who-is-streaming-stats) .stats-column-label.is-end {
+  right: 0;
+  left: auto;
+  transform: none;
+}
+
+:where(.who-is-streaming-stats) :is(.stats-heatmap, .stats-heatmap-months) {
+  display: grid;
+  grid-auto-columns: var(--stats-cell-size);
+  grid-auto-flow: column;
+  gap: var(--stats-cell-gap);
+  width: max-content;
+}
+
+:where(.who-is-streaming-stats) .stats-heatmap {
+  grid-template-rows: repeat(7, var(--stats-cell-size));
+}
+
+:where(.who-is-streaming-stats) .stats-heatmap-months {
+  height: 16px;
+  margin-bottom: 2px;
+}
+
+:where(.who-is-streaming-stats) .stats-heatmap-month {
+  overflow: visible;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  white-space: nowrap;
+}
+
+:where(.who-is-streaming-stats) .stats-heatmap-cell {
+  width: var(--stats-cell-size);
+  height: var(--stats-cell-size);
+  border-radius: 2px;
+  background: var(--stats-empty);
+}
+
+:where(.who-is-streaming-stats) .stats-heatmap-cell.is-outside {
+  visibility: hidden;
+}
+
+:where(.who-is-streaming-stats) .stats-heatmap-cell.level-1 {
+  background: color-mix(in srgb, var(--stats-accent) 35%, var(--stats-empty));
+}
+
+:where(.who-is-streaming-stats) .stats-heatmap-cell.level-2 {
+  background: color-mix(in srgb, var(--stats-accent) 58%, var(--stats-empty));
+}
+
+:where(.who-is-streaming-stats) .stats-heatmap-cell.level-3 {
+  background: color-mix(in srgb, var(--stats-accent) 80%, var(--stats-empty));
+}
+
+:where(.who-is-streaming-stats) .stats-heatmap-cell.level-4 {
+  background: var(--stats-accent);
+}
+
+:where(.who-is-streaming-stats) .stats-heatmap-legend {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+  margin-top: 8px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+
+.who-is-streaming-letterboxd-import .letterboxd-import-input {
+  display: none;
+}
+
+.who-is-streaming-letterboxd-import .letterboxd-import-note {
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+}
+
+.who-is-streaming-letterboxd-import .letterboxd-import-problem {
+  color: var(--text-error);
+}
+
+.who-is-streaming-letterboxd-import .letterboxd-import-progress {
+  width: 100%;
+}
+
+:where(.who-is-streaming-bases-view, .who-is-streaming-discover, .who-is-streaming-stats) .streaming-badge.leaving-badge {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  border: 1px solid var(--text-warning);
+  background: transparent;
+  color: var(--text-normal);
+}
+
+:where(.who-is-streaming-bases-view, .who-is-streaming-discover, .who-is-streaming-stats) .leaving-badge .leaving-badge-icon {
+  display: inline-flex;
+  color: var(--text-warning);
+}
+
+:where(.who-is-streaming-bases-view, .who-is-streaming-discover, .who-is-streaming-stats) .leaving-badge .leaving-badge-icon svg {
+  width: 1em;
+  height: 1em;
+}
+
+:where(.who-is-streaming-bases-view, .who-is-streaming-discover, .who-is-streaming-stats) .poster-overlay .streaming-badge.leaving-badge {
+  color: var(--wis-on-poster);
+}
+
+.who-is-streaming-discover {
+  padding: 4px 16px 24px;
+}
+
+.who-is-streaming-discover .discover-warning {
+  margin: 8px 0;
+  padding: 8px 12px;
+  border-radius: var(--radius-m);
+  background: var(--background-secondary);
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+}
+
+.who-is-streaming-discover .movie-poster-item.is-not-in-vault,
+.who-is-streaming-discover .movie-card.is-not-in-vault .movie-card-inner {
+  cursor: default;
+}
+
+.who-is-streaming-discover :is(.poster-overlay-action, .movie-card-action) button {
+  cursor: pointer;
+}
+
+.who-is-streaming-discover .movie-card-action {
+  margin-top: 8px;
+}
+
+.who-is-streaming-discover .who-is-streaming-results.poster-view {
+  padding: 10px 0;
+}
+
+.who-is-streaming-discover .poster-overlay-action {
+  margin-top: 8px;
+}
+
+.who-is-streaming-discover .poster-overlay-action button {
+  width: 100%;
+}
+
+.who-is-streaming-discover .discover-status {
+  padding: 16px 0;
+  color: var(--text-muted);
+  text-align: center;
 }

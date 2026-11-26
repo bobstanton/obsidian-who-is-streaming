@@ -1,3 +1,5 @@
+import { DEFAULT_FIELD_SOURCES, FieldSources } from "./fields";
+
 export type PosterMode = "none" | "local" | "remote";
 
 export interface StreamingServiceSetting {
@@ -63,6 +65,12 @@ export interface WhoIsStreamingSettings {
   /**
    * Format to use when a note is being renamed (for movies).
    */
+  genresCache: { id: string; name: string }[];
+
+  genresCacheAsOf: number;
+
+  tmdbApiKey: string;
+
   noteNameFormat: string;
 
   /**
@@ -70,10 +78,8 @@ export interface WhoIsStreamingSettings {
    */
   noteNameFormatSeries: string;
 
-  /**
-   * The streaming services to sync with.
-   * The key represents the service name, and the value represents the streaming availability service.
-   */
+  noteTemplateFile: string;
+
   streamingServicesToSync: { [key: string]: StreamingServiceSetting };
 
   /**
@@ -86,14 +92,6 @@ export interface WhoIsStreamingSettings {
    */
   posterFolder: string;
 
-  /**
-   * Whether to add streaming service direct links
-   */
-  addStreamingLinks: boolean;
-
-  /**
-   * Whether to show preview dialog before syncing
-   */
   showPreviewDialog: boolean;
 
   /**
@@ -116,25 +114,7 @@ export interface WhoIsStreamingSettings {
    */
   rateLimitWarningThreshold: number;
 
-  /**
-   * Fields that are enabled by default in preview and bulk refresh.
-   * "Type" and "tmdb_id" are always required and cannot be disabled.
-   * Special values:
-   * - "File Name" - rename the note
-   * - "Poster" - poster image
-   * - "Year" - release/first air year
-   * - "Directors" - director names
-   * - "Cast" - cast member names
-   * - "Overview" - show description
-   * - "Genres" - genre list
-   * - "Runtime" - runtime in minutes
-   * - "Rating" - IMDB rating
-   * - "Seasons" - number of seasons
-   * - "Episodes" - number of episodes
-   * - Streaming service names
-   * - Jellyfin instance names
-   */
-  defaultEnabledFields: string[];
+  fieldSources: FieldSources;
 }
 
 export const DEFAULT_SETTINGS: WhoIsStreamingSettings = {
@@ -142,28 +122,19 @@ export const DEFAULT_SETTINGS: WhoIsStreamingSettings = {
   country: "us",
   countriesCache: {},
   countriesCacheAsOf: new Date(0),
+  genresCache: [],
+  genresCacheAsOf: 0,
+  tmdbApiKey: "",
   noteNameFormat: "${title} (${year})",
   noteNameFormatSeries: "${title} (${firstAirYear}-${lastAirYear})",
+  noteTemplateFile: "",
   streamingServicesToSync: {},
   posterMode: "remote",
   posterFolder: "posters",
-  addStreamingLinks: true,
   showPreviewDialog: true,
   gridPosterSize: 200,
   jellyfinInstances: [],
   bulkRefreshLimit: 40,
   rateLimitWarningThreshold: 80,
-  defaultEnabledFields: [
-    "File Name",
-    "Poster",
-    "Year",
-    "Directors",
-    "Cast",
-    "Overview",
-    "Genres",
-    "Runtime",
-    "Rating",
-    "Seasons",
-    "Episodes",
-  ],
+  fieldSources: { ...DEFAULT_FIELD_SOURCES },
 };

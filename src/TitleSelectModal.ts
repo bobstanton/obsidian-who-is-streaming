@@ -2,7 +2,7 @@ import { App, SuggestModal, setIcon } from "obsidian";
 import { Show } from "streaming-availability";
 import { decode } from "he";
 
-export class ShowSelectModal extends SuggestModal<Show> {
+export class TitleSelectModal extends SuggestModal<Show> {
   showMatches: Show[];
   callback: (show: Show) => void;
 
@@ -39,7 +39,8 @@ export class ShowSelectModal extends SuggestModal<Show> {
     } else {
       const iconDiv = contentContainer.createDiv({ cls: "suggestion-icon-fallback" });
       const icon = createSpan({ cls: "show-icon" });
-      setIcon(icon, show.showType == "movie" ? "clapperboard" : "tv");
+
+      setIcon(icon, show.showType === "movie" ? "clapperboard" : "tv");
       iconDiv.append(icon);
     }
 
@@ -53,10 +54,10 @@ export class ShowSelectModal extends SuggestModal<Show> {
     }
 
     const metaDiv = detailsDiv.createDiv({ cls: "show-meta" });
-    const typeText = show.showType === "movie" ? "Movie" : "TV Series";
+    const typeText = show.showType === "movie" ? "Movie" : "Series";
     let metaText = typeText;
     if (show.rating) {
-      metaText += ` • ⭐ ${show.rating}/10`;
+      metaText += ` • Streaming Availability ${show.rating}`;
     }
     if (show.runtime) {
       metaText += ` • ${show.runtime} min`;

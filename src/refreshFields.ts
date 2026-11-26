@@ -3,6 +3,8 @@ import { decode } from "he";
 import { WhoIsStreamingSettings } from "./settings";
 import { JellyfinAvailability } from "./JellyfinApiService";
 import { formatLastSynced } from "./lastSynced";
+import { JELLYFIN_AVAILABILITY_FIELD, JELLYFIN_LINKS_FIELD, STREAMING_AVAILABILITY_FIELD, STREAMING_LINKS_FIELD, getFieldSource, getFieldsFrom } from "./fields";
+import { LAST_SYNCED_PROPERTY, POSTER_PROPERTY, SERVICE_RATING_PROPERTY, TMDB_ID_PROPERTY, TYPE_PROPERTY, YEAR_PROPERTY } from "./properties";
 
 interface StreamingService {
   service: { id: string };
@@ -16,31 +18,15 @@ interface Genre {
   name: string;
 }
 
-export interface SyncField {
+export interface RefreshField {
   name: string;
   value: unknown;
-  previewValue?: string;
-  isPoster?: boolean;
-  posterUrl?: string;
-  alwaysSync?: boolean;
+  always?: boolean;
   enabledBy?: string;
-  showInPreview?: boolean;
 }
 
 export function getTmdbId(show: Show): string {
   return show.tmdbId.split('/').pop() || show.tmdbId;
-}
-
-export function applyShowTemplate(template: string, show: Show): string {
-  return template
-    .replace("${title}", show.title)
-    .replace("${year}", formatTemplateValue(show.releaseYear || show.firstAirYear))
-    .replace("${firstAirYear}", formatTemplateValue(show.firstAirYear))
-    .replace("${lastAirYear}", formatTemplateValue(show.lastAirYear))
-    .replace("${tmdb_id}", formatTemplateValue(show.tmdbId))
-    .replace("${rating}", formatTemplateValue(show.rating))
-    .replace("${runtime}", formatTemplateValue(show.runtime))
-    .replace(/[/\\?%*:|"<>]/g, "-");
 }
 
 function formatTemplateValue(value: unknown): string {
@@ -51,50 +37,38 @@ function formatTemplateValue(value: unknown): string {
   return "";
 }
 
-export function getEnabledSyncFields(settings: WhoIsStreamingSettings, overrides: Map<string, boolean> = new Map()): string[] {
+export function getEnabledFields(settings: WhoIsStreamingSettings): string[] {
   const enabledFields = new Set<string>([
-    ...settings.defaultEnabledFields,
+    ...getFieldsFrom(settings, "streaming"),
     "Type",
     "tmdb_id",
   ]);
 
-  Object.values(settings.streamingServicesToSync).forEach((service) => {
+  for (const service of Object.values(settings.streamingServicesToSync)) {
     enabledFields.add(service.name);
-  });
+  }
 
-  settings.jellyfinInstances.forEach((instance) => {
+  for (const instance of settings.jellyfinInstances) {
     enabledFields.add(instance.name);
-  });
-
-  overrides.forEach((enabled, field) => {
-    if (enabled) {
-      enabledFields.add(field);
-    } else {
-      enabledFields.delete(field);
-    }
-  });
+  }
 
   return Array.from(enabledFields);
 }
 
-export function isSyncFieldEnabled(settings: WhoIsStreamingSettings, fieldName: string, enabledFields?: string[]): boolean {
+export function isRefreshFieldEnabled(settings: WhoIsStreamingSettings, fieldName: string, enabledFields?: string[]): boolean {
   if (enabledFields) {
     return enabledFields.includes(fieldName);
   }
 
-  return getEnabledSyncFields(settings).includes(fieldName);
+  return getEnabledFields(settings).includes(fieldName);
 }
 
-export function buildSyncFields(
-  settings: WhoIsStreamingSettings,
-  show: Show,
-  jellyfinAvailability: JellyfinAvailability[] = []
-): SyncField[] {
+export function buildRefreshFields(settings: WhoIsStreamingSettings, show: Show, jellyfinAvailability: JellyfinAvailability[] = []): RefreshField[] {
   const tmdbId = getTmdbId(show);
-  const fields: SyncField[] = [
-    { name: "tmdb_id", value: parseInt(tmdbId), alwaysSync: true, showInPreview: false },
-    { name: "Type", value: show.showType, alwaysSync: true },
-    { name: "Year", value: show.releaseYear || show.firstAirYear },
+  const fields: RefreshField[] = [
+    { name: TMDB_ID_PROPERTY, value: parseInt(tmdbId), always: true },
+    { name: TYPE_PROPERTY, value: show.showType, always: true },
+    { name: YEAR_PROPERTY, value: show.releaseYear || show.firstAirYear },
     { name: "Directors", value: show.directors },
     { name: "Cast", value: show.cast },
     { name: "Overview", value: typeof show.overview === "string" ? decode(show.overview) : undefined },
@@ -106,7 +80,7 @@ export function buildSyncFields(
   }
 
   if (show.rating) {
-    fields.push({ name: "Rating", value: show.rating });
+    fields.push({ name: SERVICE_RATING_PROPERTY, value: show.rating });
   }
 
   if (show.seasonCount) {
@@ -123,31 +97,26 @@ export function buildSyncFields(
       : show.imageSet.verticalPoster.w480;
 
     fields.push({
-      name: "Poster",
+      name: POSTER_PROPERTY,
       value: posterValue,
-      isPoster: true,
-      posterUrl: show.imageSet.verticalPoster.w240,
     });
   }
 
-  buildStreamingServiceFields(settings, show).forEach((field) => fields.push(field));
-  buildJellyfinSyncFields(settings, jellyfinAvailability).forEach((field) => fields.push(field));
+  fields.push(...buildStreamingServiceFields(settings, show), ...buildJellyfinFields(settings, jellyfinAvailability));
 
-  const isWatched = jellyfinAvailability.some((availability) => availability.watched === true);
-  if (isWatched) {
-    fields.push({ name: "Watched", value: true, alwaysSync: true, showInPreview: false });
-  }
-
-  fields.push({ name: "Last Synced", value: formatLastSynced(new Date()), alwaysSync: true, showInPreview: false });
+  fields.push({ name: LAST_SYNCED_PROPERTY, value: formatLastSynced(new Date()), always: true });
 
   return fields.filter((field) => field.value !== null && field.value !== undefined && field.value !== "");
 }
 
-function buildStreamingServiceFields(settings: WhoIsStreamingSettings, show: Show): SyncField[] {
+function buildStreamingServiceFields(settings: WhoIsStreamingSettings, show: Show): RefreshField[] {
   const showsStreamingServices = (show.streamingOptions[settings.country] || []).filter((service: StreamingService) => {
     return !service.addon?.id?.startsWith("tvs.sbd")
       && (service.type === "subscription" || service.type === "addon");
   });
+
+  if (getFieldSource(settings, STREAMING_AVAILABILITY_FIELD) !== "streaming") return [];
+  const withLinks = getFieldSource(settings, STREAMING_LINKS_FIELD) === "streaming";
 
   return Object.values(settings.streamingServicesToSync).flatMap((streamingServiceToSync) => {
     const streamingServiceName = formatTemplateValue(streamingServiceToSync.name);
@@ -158,18 +127,17 @@ function buildStreamingServiceFields(settings: WhoIsStreamingSettings, show: Sho
     const matchedService = showsStreamingServices.find(
       (showsService) => showsService.service.id === streamingServiceToSync.id
     );
-    const fields: SyncField[] = [{
+    const fields: RefreshField[] = [{
       name: streamingServiceName,
       value: describeStreamingService(matchedService),
     }];
 
     const streamingLink = formatTemplateValue(matchedService?.link);
-    if (settings.addStreamingLinks && streamingLink.length > 0) {
+    if (withLinks && streamingLink.length > 0) {
       fields.push({
-        name: `${streamingServiceName} Link`,
+        name: `${streamingServiceName} link`,
         value: streamingLink,
         enabledBy: streamingServiceName,
-        showInPreview: false,
       });
     }
 
@@ -195,28 +163,30 @@ function describeStreamingService(service: StreamingService | undefined): string
   return "Not available";
 }
 
-export function buildJellyfinSyncFields(settings: WhoIsStreamingSettings, jellyfinAvailability: JellyfinAvailability[]): SyncField[] {
+export function buildJellyfinFields(settings: WhoIsStreamingSettings, jellyfinAvailability: JellyfinAvailability[]): RefreshField[] {
+  if (getFieldSource(settings, JELLYFIN_AVAILABILITY_FIELD) !== "jellyfin") return [];
+  const withLinks = getFieldSource(settings, JELLYFIN_LINKS_FIELD) === "jellyfin";
+
   return jellyfinAvailability.flatMap((availability) => {
     const instanceName = formatTemplateValue(availability.instanceName);
     if (instanceName.length === 0) {
       return [];
     }
 
-    const fields: SyncField[] = [{
+    const fields: RefreshField[] = [{
       name: instanceName,
       value: availability.available ? "Available" : "Not available",
     }];
 
-    if (availability.available && availability.itemId) {
+    if (withLinks && availability.available && availability.itemId) {
       const itemId = formatTemplateValue(availability.itemId);
       const instance = settings.jellyfinInstances.find((item) => item.name === instanceName);
       if (instance) {
         const baseUrl = instance.url.replace(/\/+$/, '');
         fields.push({
-          name: `${instanceName} Link`,
+          name: `${instanceName} link`,
           value: `${baseUrl}/web/index.html#!/details?id=${itemId}`,
           enabledBy: instanceName,
-          showInPreview: false,
         });
       }
     }

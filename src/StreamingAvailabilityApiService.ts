@@ -1,8 +1,49 @@
-import { Client, Configuration, Show } from "streaming-availability";
+import { Client, Configuration, Show, ShowType } from "streaming-availability";
 import { StreamingCountrySetting, WhoIsStreamingSettings } from "./settings";
-import { Notice, requestUrl } from "obsidian";
+import { Notice } from "obsidian";
+import { obsidianFetch } from "./obsidianFetch";
+
+const DISCOVERY_CACHE_MS = 24 * 60 * 60 * 1000;
+const DEFAULT_CHANGE_PAGES = 4;
+const GENRES_CACHE_MS = 7 * 24 * 60 * 60 * 1000;
+
+export type DiscoveryChangeType = "new" | "expiring" | "upcoming";
+
+export interface ChangedShow {
+  show: Show;
+  serviceId: string;
+  serviceName: string;
+  timestamp?: number;
+}
+
+export interface ChangesLookup {
+  items: ChangedShow[];
+  complete: boolean;
+}
+
+export interface BrowseFilters {
+  showType?: ShowType;
+  genres?: string[];
+  genresRelation?: "and" | "or";
+  keyword?: string;
+  showOriginalLanguage?: string;
+  yearMin?: number;
+  yearMax?: number;
+  ratingMin?: number;
+  services?: string[];
+  orderBy: "original_title" | "release_date" | "rating" | "popularity_alltime" | "popularity_1year" | "popularity_1month" | "popularity_1week";
+  cursor?: string;
+}
+
+export interface BrowsePage {
+  shows: Show[];
+  hasMore: boolean;
+  nextCursor?: string;
+}
 
 export default class StreamingAvailabilityApiService {
+  private discoveryCache = new Map<string, { at: number; value: unknown }>();
+
   settings: WhoIsStreamingSettings;
   apiClient: Client;
   apiShowCache: Map<string, Show | undefined>;
@@ -83,12 +124,12 @@ export default class StreamingAvailabilityApiService {
     }
   }
 
-  async searchForShowsByTitle(searchTerm: string): Promise<Array<Show>> {
+  async searchForShowsByTitle(searchTerm: string, showType?: ShowType): Promise<Array<Show>> {
     if (!this.validateApiKey()) {
       return [];
     }
 
-    const cacheKey = `searchForShowsByTitle|${searchTerm}`;
+    const cacheKey = `searchForShowsByTitle|${showType ?? "any"}|${searchTerm}`;
     const cachedResponse = this.apiSearchCache.get(cacheKey);
     if (cachedResponse) return cachedResponse;
 
@@ -96,6 +137,7 @@ export default class StreamingAvailabilityApiService {
       const apiResponse = await this.apiClient.showsApi.searchShowsByTitleRaw({
         country: this.settings.country,
         title: searchTerm,
+        showType,
       });
 
       this.checkRateLimitHeaders(apiResponse.raw);
@@ -107,6 +149,170 @@ export default class StreamingAvailabilityApiService {
     } catch (error: unknown) {
       await this.handleApiError(error);
       return [];
+    }
+  }
+
+  getEnabledServiceIds(): string[] {
+    return [...new Set(Object.values(this.settings.streamingServicesToSync).map((service) => service.id))];
+  }
+
+  private async cachedDiscovery<T>(key: string, force: boolean, load: () => Promise<T>): Promise<T | undefined> {
+    const cacheKey = `${this.settings.country}|${key}`;
+    const cached = this.discoveryCache.get(cacheKey);
+
+    if (!force && cached && Date.now() - cached.at < DISCOVERY_CACHE_MS) {
+      return cached.value as T;
+    }
+
+    try {
+      const value = await load();
+
+      this.discoveryCache.set(cacheKey, { at: Date.now(), value });
+
+      return value;
+    } catch (error: unknown) {
+      await this.handleApiError(error);
+
+      return undefined;
+    }
+  }
+
+  async getChanges(changeType: DiscoveryChangeType, options: { showType?: ShowType; maxPages?: number; force?: boolean; services?: string[] } = {}): Promise<ChangesLookup | undefined> {
+    if (!this.validateApiKey()) return undefined;
+
+    const catalogs = options.services ?? this.getEnabledServiceIds();
+
+    if (catalogs.length === 0) {
+      new Notice("Enable at least one streaming service in settings first");
+
+      return undefined;
+    }
+
+    const maxPages = options.maxPages ?? DEFAULT_CHANGE_PAGES;
+    const key = `changes|${changeType}|${options.showType ?? "any"}|${catalogs.join(",")}|${maxPages}`;
+
+    return this.cachedDiscovery(key, options.force === true, async () => {
+      const found = new Map<string, ChangedShow>();
+      let cursor: string | undefined;
+      let complete = false;
+
+      for (let page = 0; page < maxPages; page++) {
+        const apiResponse = await this.apiClient.changesApi.getChangesRaw({
+          country: this.settings.country,
+          changeType,
+          itemType: "show",
+          catalogs,
+          showType: options.showType,
+          orderDirection: changeType === "new" ? "desc" : "asc",
+          cursor,
+        });
+
+        this.checkRateLimitHeaders(apiResponse.raw);
+        const result = await apiResponse.value();
+
+        for (const change of result.changes) {
+          const show = result.shows[change.showId];
+
+          if (!show) continue;
+          const itemKey = `${change.showId}|${change.service.id}`;
+
+          if (!found.has(itemKey)) {
+            found.set(itemKey, {
+              show,
+              serviceId: change.service.id,
+              serviceName: change.service.name,
+              timestamp: change.timestamp,
+            });
+          }
+        }
+
+        if (!result.hasMore || !result.nextCursor) {
+          complete = true;
+          break;
+        }
+
+        cursor = result.nextCursor;
+      }
+
+      return { items: [...found.values()], complete };
+    });
+  }
+
+  async getTopShows(serviceId: string, showType?: ShowType, force = false): Promise<Show[] | undefined> {
+    if (!this.validateApiKey()) return undefined;
+
+    return this.cachedDiscovery(`top|${serviceId}|${showType ?? "any"}`, force, async () => {
+      const apiResponse = await this.apiClient.showsApi.getTopShowsRaw({
+        country: this.settings.country,
+        service: serviceId,
+        showType,
+      });
+
+      this.checkRateLimitHeaders(apiResponse.raw);
+
+      return apiResponse.value();
+    });
+  }
+
+  async browseShows(filters: BrowseFilters, force = false): Promise<BrowsePage | undefined> {
+    if (!this.validateApiKey()) return undefined;
+
+    const catalogs = filters.services ?? this.getEnabledServiceIds();
+
+    if (catalogs.length === 0) {
+      new Notice("Enable at least one streaming service in settings first");
+
+      return undefined;
+    }
+
+    return this.cachedDiscovery(`browse|${catalogs.join(",")}|${JSON.stringify(filters)}`, force, async () => {
+      const apiResponse = await this.apiClient.showsApi.searchShowsByFiltersRaw({
+        country: this.settings.country,
+        catalogs,
+        showType: filters.showType,
+        genres: filters.genres && filters.genres.length > 0 ? filters.genres : undefined,
+        genresRelation: filters.genres && filters.genres.length > 1 ? filters.genresRelation : undefined,
+        keyword: filters.keyword || undefined,
+        showOriginalLanguage: filters.showOriginalLanguage || undefined,
+        yearMin: filters.yearMin,
+        yearMax: filters.yearMax,
+        ratingMin: filters.ratingMin,
+        orderBy: filters.orderBy,
+        orderDirection: filters.orderBy === "original_title" ? "asc" : "desc",
+        seriesGranularity: "show",
+        cursor: filters.cursor,
+      });
+
+      this.checkRateLimitHeaders(apiResponse.raw);
+      const result = await apiResponse.value();
+
+      return { shows: result.shows, hasMore: result.hasMore, nextCursor: result.nextCursor };
+    });
+  }
+
+  async getGenres(): Promise<{ id: string; name: string }[]> {
+    const cached = this.settings.genresCache ?? [];
+    const ageMs = Date.now() - (this.settings.genresCacheAsOf ?? 0);
+
+    if (cached.length > 0 && ageMs < GENRES_CACHE_MS) return cached;
+    if (!this.hasApiKey()) return cached;
+
+    try {
+      const apiResponse = await this.apiClient.genresApi.getGenresRaw({ outputLanguage: "en" });
+
+      this.checkRateLimitHeaders(apiResponse.raw);
+      const genres = (await apiResponse.value()).map((genre) => ({ id: genre.id, name: genre.name }));
+
+      if (genres.length === 0) return cached;
+
+      this.settings.genresCache = genres;
+      this.settings.genresCacheAsOf = Date.now();
+
+      return genres;
+    } catch (error: unknown) {
+      console.debug("Who Is Streaming: genre list could not be refreshed", error);
+
+      return cached;
     }
   }
 
@@ -134,19 +340,24 @@ export default class StreamingAvailabilityApiService {
     }
 
     if (status === 404) {
-      return "Show not found in the streaming database.";
+      return "Title not found.";
     }
 
     if (status >= 500) {
-      return "Streaming API server error. Please try again later.";
+      return "Streaming Availability API server error. Please try again later.";
     }
 
-    return `Streaming API request failed with HTTP ${status}.`;
+    return `Streaming Availability API request failed with HTTP ${status}.`;
+  }
+
+  hasApiKey(): boolean {
+    const apiKey = this.settings.apiKey?.trim();
+
+    return apiKey !== undefined && (apiKey.startsWith("motn-key-") || apiKey.length === 50);
   }
 
   validateApiKey(): boolean {
-    const apiKey = this.settings.apiKey?.trim();
-    if (!apiKey || (!apiKey.startsWith("motn-key-") && apiKey.length !== 50)) {
+    if (!this.hasApiKey()) {
       new Notice("Add a valid Streaming Availability API key in settings.");
       return false;
     }
@@ -306,72 +517,4 @@ function getRateLimitResetMessage(reset: string | null): string | undefined {
 
 function formatRateLimitValue(value: number): string {
   return Number.isInteger(value) ? value.toString() : value.toFixed(1);
-}
-
-async function obsidianFetch(url: string, init: RequestInit): Promise<Response> {
-  const response = await requestUrl({
-    url,
-    method: init.method,
-    headers: normalizeRequestHeaders(init.headers),
-    body: await normalizeRequestBody(init.body),
-    throw: false,
-  });
-
-  return new Response(response.arrayBuffer, {
-    status: response.status,
-    headers: response.headers,
-  });
-}
-
-function normalizeRequestHeaders(headers: HeadersInit | undefined): Record<string, string> {
-  const normalizedHeaders: Record<string, string> = {};
-  if (!headers) {
-    return normalizedHeaders;
-  }
-
-  if (headers instanceof Headers) {
-    headers.forEach((value, key) => {
-      normalizedHeaders[key] = value;
-    });
-    return normalizedHeaders;
-  }
-
-  if (Array.isArray(headers)) {
-    headers.forEach(([key, value]) => {
-      normalizedHeaders[key] = value;
-    });
-    return normalizedHeaders;
-  }
-
-  Object.entries(headers).forEach(([key, value]) => {
-    if (value !== undefined) {
-      normalizedHeaders[key] = String(value);
-    }
-  });
-
-  return normalizedHeaders;
-}
-
-async function normalizeRequestBody(body: BodyInit | null | undefined): Promise<string | ArrayBuffer | undefined> {
-  if (body === null || body === undefined) {
-    return undefined;
-  }
-
-  if (typeof body === "string" || body instanceof ArrayBuffer) {
-    return body;
-  }
-
-  if (ArrayBuffer.isView(body)) {
-    return body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength);
-  }
-
-  if (body instanceof URLSearchParams) {
-    return body.toString();
-  }
-
-  if (body instanceof Blob) {
-    return body.arrayBuffer();
-  }
-
-  throw new Error("Unsupported Streaming Availability request body type.");
 }

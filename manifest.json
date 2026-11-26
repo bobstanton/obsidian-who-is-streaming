@@ -1,7 +1,7 @@
 {
 	"id": "who-is-streaming",
 	"name": "Who Is Streaming",
-	"version": "1.2.5",
+	"version": "1.3.0",
 	"minAppVersion": "1.13.0",
 	"description": "Discover and document which streaming services a movie is currently available to be streamed on.",
 	"author": "Bob Stanton",

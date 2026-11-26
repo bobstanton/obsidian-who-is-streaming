@@ -49,7 +49,7 @@ export default defineConfig([
   {
     rules: {
       "obsidianmd/ui/sentence-case": ["error", {
-        brands: [...DEFAULT_BRANDS, "Jellyfin", "Movie of the Night", "Streaming Availability API"],
+        brands: [...DEFAULT_BRANDS, "Jellyfin", "Letterboxd", "Movie of the Night", "Streaming Availability API"],
         acronyms: [...DEFAULT_ACRONYMS, "TMDB", "TV"],
         enforceCamelCaseLower: true,
       }],

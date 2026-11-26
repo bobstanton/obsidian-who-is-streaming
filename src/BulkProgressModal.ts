@@ -1,20 +1,21 @@
 import { App, Modal } from "obsidian";
+import { Outcome } from "./outcome";
 
-export class BulkSyncProgressModal extends Modal {
-  totalFiles: number;
+const MAX_FILES_LISTED = 10;
+
+export class BulkProgressModal extends Modal {
   currentIndex: number = 0;
   successCount: number = 0;
   failureCount: number = 0;
-  progressBarEl: HTMLProgressElement;
-  statusEl: HTMLElement;
-  detailsEl: HTMLElement;
-  errorsEl: HTMLElement;
+  progressBarEl!: HTMLProgressElement;
+  statusEl!: HTMLElement;
+  detailsEl!: HTMLElement;
+  errorsEl!: HTMLElement;
   cancelled: boolean = false;
   errors: { file: string; error: string }[] = [];
 
-  constructor(app: App, totalFiles: number) {
+  constructor(app: App, private totalFiles: number, private title: string) {
     super(app);
-    this.totalFiles = totalFiles;
   }
 
   onOpen() {
@@ -22,7 +23,7 @@ export class BulkSyncProgressModal extends Modal {
     contentEl.empty();
     contentEl.addClass("who-is-streaming-progress-modal");
 
-    contentEl.createEl("h2", { text: "Refreshing shows" });
+    contentEl.createEl("h2", { text: this.title });
 
     const progressContainer = contentEl.createDiv({ cls: "progress-container" });
     this.progressBarEl = progressContainer.createEl("progress", {
@@ -45,7 +46,7 @@ export class BulkSyncProgressModal extends Modal {
     cancelBtn.onclick = () => {
       this.cancelled = true;
       cancelBtn.disabled = true;
-      cancelBtn.textContent = "Cancelling...";
+      cancelBtn.textContent = "Cancelling…";
     };
   }
 
@@ -64,6 +65,12 @@ export class BulkSyncProgressModal extends Modal {
     );
   }
 
+  record(fileName: string, outcome: Outcome) {
+    if (outcome.status === "ok") this.recordSuccess();
+    else if (outcome.status === "warning") this.recordWarning(fileName, outcome.message);
+    else this.recordFailure(fileName, outcome.message);
+  }
+
   recordSuccess() {
     this.successCount++;
     this.updateStatus();
@@ -79,6 +86,13 @@ export class BulkSyncProgressModal extends Modal {
     }
   }
 
+  recordWarning(fileName: string, message: string) {
+    this.successCount++;
+    this.updateStatus();
+    this.errors.push({ file: fileName, error: message });
+    this.updateErrors();
+  }
+
   updateErrors() {
     if (this.errors.length === 0) {
       this.errorsEl.addClass("hidden");
@@ -88,25 +102,26 @@ export class BulkSyncProgressModal extends Modal {
     this.errorsEl.removeClass("hidden");
     this.errorsEl.empty();
 
-    this.errorsEl.createEl("h4", { text: "Errors:", cls: "progress-error-header" });
+    this.errorsEl.createEl("h4", { text: "Problems:", cls: "progress-error-header" });
 
     const errorList = this.errorsEl.createDiv({ cls: "progress-error-list" });
 
     const errorGroups = new Map<string, string[]>();
-    this.errors.forEach(({ file, error }) => {
-      if (!errorGroups.has(error)) {
-        errorGroups.set(error, []);
-      }
-      errorGroups.get(error)!.push(file);
-    });
 
-    errorGroups.forEach((files, error) => {
+    for (const { file, error } of this.errors) {
+      errorGroups.set(error, [...(errorGroups.get(error) ?? []), file]);
+    }
+
+    for (const [error, files] of errorGroups) {
       const errorItem = errorList.createDiv({ cls: "progress-error-item" });
 
       errorItem.createEl("strong", { text: error, cls: "progress-error-text" });
 
-      errorItem.createDiv({ text: `${files.length} file(s) affected`, cls: "progress-error-file-count" });
-    });
+      const shown = files.slice(0, MAX_FILES_LISTED).join(", ");
+      const more = files.length > MAX_FILES_LISTED ? `, and ${files.length - MAX_FILES_LISTED} more` : "";
+
+      errorItem.createDiv({ text: `${shown}${more}`, cls: "progress-error-file-count" });
+    }
   }
 
   complete() {

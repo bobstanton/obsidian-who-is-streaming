@@ -1,6 +1,6 @@
 {
 	"name": "who-is-streaming",
-	"version": "1.2.5",
+	"version": "1.3.0",
 	"description": "Discover and keep track of which streaming services a movie is currently available to be streamed on.",
 	"main": "main.js",
 	"scripts": {
@@ -15,16 +15,22 @@
 	"author": "Bob Stanton",
 	"license": "MIT",
 	"devDependencies": {
-		"@types/node": "^24.10.1",
-		"esbuild": "0.27.0",
+		"@types/d3-force": "^3.0.10",
+		"@types/node": "^24.19.2",
+		"@types/papaparse": "^5.5.2",
+		"esbuild": "^0.28.2",
 		"eslint": "^10.3.0",
-		"eslint-plugin-obsidianmd": "^0.4.2",
+		"eslint-plugin-obsidianmd": "^0.6.0",
 		"obsidian": "^1.13.0",
-		"typescript": "5.9.3",
+		"typescript": "^6.0.3",
 		"typescript-eslint": "^8.59.3"
 	},
 	"dependencies": {
-		"he": "^1.2.0",
+		"d3-force": "^3.0.1",
+		"fflate": "^0.8.3",
+		"he": "^2.0.0",
+		"knap": "^0.6.0",
+		"papaparse": "^5.7.1",
 		"streaming-availability": "^4.5.0"
 	}
 }

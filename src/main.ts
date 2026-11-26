@@ -1,519 +1,106 @@
-import { Editor, ItemView, MarkdownView, Notice, Plugin, TFile, normalizePath, requestUrl } from "obsidian";
-import { ShowType, Show } from "streaming-availability";
+import { ItemView, Notice, Plugin, TFile } from "obsidian";
+import { Show } from "streaming-availability";
 import { WhoIsStreamingSettingsTab } from "./WhoIsStreamingSettingsTab";
-import { ShowSelectModal } from "./ShowSelectModal";
-import { PreviewSyncModal } from "./PreviewSyncModal";
-import { BulkSyncProgressModal } from "./BulkSyncProgressModal";
+import { TitleSelectModal } from "./TitleSelectModal";
+import { previewPlan } from "./PreviewRefreshModal";
 import StreamingAvailabilityApiService from "./StreamingAvailabilityApiService";
 import JellyfinApiService, { JellyfinAvailability } from "./JellyfinApiService";
-import { MoviesBasesView, MoviesViewType } from "./MoviesBasesView";
-import { WhoIsStreamingSettings, DEFAULT_SETTINGS, JellyfinInstance, isJellyfinInstanceComplete } from "./settings";
-import { applyShowTemplate, buildJellyfinSyncFields, buildSyncFields, getEnabledSyncFields, getTmdbId, isSyncFieldEnabled } from "./syncFields";
+import { TitlesBasesView, TitlesViewType } from "./TitlesBasesView";
+import { CastGraphBasesView, CastGraphViewType } from "./CastGraphBasesView";
+import { StatsBasesView, StatsViewType } from "./StatsBasesView";
+import { DiscoverBasesView, DiscoverViewType } from "./DiscoverBasesView";
+import TmdbApiService from "./TmdbApiService";
+import { TmdbNotes } from "./TmdbNotes";
+import { JellyfinNotes } from "./JellyfinNotes";
+import { registerCommands } from "./commands";
+import { runBulkOperation } from "./bulk";
+import { DEFAULT_FIELD_SOURCES, NOTE_NAME_FIELD, getFieldsFrom } from "./fields";
+import { isRecord } from "./frontmatterUtils";
+import { applyLeavingFromShow, updateLeavingSoon } from "./leavingSoon";
 import { parseLastSynced } from "./lastSynced";
+import { downloadPoster, readTitleId } from "./notes";
+import { Outcome, failed, warned } from "./outcome";
+import { LAST_SYNCED_PROPERTY, LETTERBOXD_PROPERTY, POSTER_PROPERTY, TMDB_ID_PROPERTY, WATCHED_PROPERTY } from "./properties";
+import { WhoIsStreamingSettings, DEFAULT_SETTINGS, JellyfinInstance, isJellyfinInstanceComplete } from "./settings";
+import { buildRefreshFields, getEnabledFields, isRefreshFieldEnabled } from "./refreshFields";
+import { getShowTemplateVariables, renderFileName } from "./templates";
+import { getFrontmatter, getNoteTitle, getNoteYear, getVaultTitles, guessImportFolder, normaliseTitle } from "./vaultTitles";
+import { addWatchDates, applyJellyfinRuntime, applyJellyfinWatchHistory, toDayString } from "./watchHistory";
+import { TitleType, showTitleId } from "./titleId";
+import { RefreshPlan, applyPlan, combinePlans } from "./refreshPlan";
+import { applyNoteTemplate, createTitleNote, propertyVariables } from "./titleNotes";
+import { RefreshReporter, describeError } from "./refreshReporter";
+
+type TitleListView = TitlesBasesView | StatsBasesView;
 
 export default class WhoIsStreamingPlugin extends Plugin {
-  settings: WhoIsStreamingSettings;
-  streamingAvailabilityApi: StreamingAvailabilityApiService;
-  jellyfinApiService: JellyfinApiService;
-  private moviesViews = new Set<MoviesBasesView>();
+  settings!: WhoIsStreamingSettings;
+  streamingAvailabilityApi!: StreamingAvailabilityApiService;
+  jellyfinApiService!: JellyfinApiService;
+  tmdbApi!: TmdbApiService;
+  tmdbNotes!: TmdbNotes;
+  jellyfinNotes!: JellyfinNotes;
+  private titlesViews = new Set<TitlesBasesView>();
+  private statsViews = new Set<StatsBasesView>();
 
   async onload() {
     await this.loadSettings();
     this.setupApiClient();
+    this.tmdbApi = new TmdbApiService(this.settings);
+    this.tmdbNotes = new TmdbNotes(this);
     this.jellyfinApiService = new JellyfinApiService();
+    this.jellyfinApiService.tmdbIdResolver = async (ids) =>
+      this.tmdbApi.isConfigured() ? this.tmdbApi.findByExternalId(ids.type, ids) : undefined;
+    this.jellyfinNotes = new JellyfinNotes(this);
 
     this.addSettingTab(new WhoIsStreamingSettingsTab(this.app, this));
+    this.registerViews();
+    registerCommands(this);
+    this.app.workspace.onLayoutReady(() => void this.getGenres());
 
-    this.registerBasesView(MoviesViewType, {
-      name: "Movies",
-      icon: "film",
-      factory: (controller, scrollEl) =>
-        new MoviesBasesView(controller, scrollEl, this),
-        options: MoviesBasesView.getViewOptions,
-    });
-
-    const ribbonCommand = this.addRibbonIcon("popcorn", "Who is streaming", async (evt: MouseEvent) => {
+    const ribbon = this.addRibbonIcon("popcorn", "Who is streaming", async () => {
       try {
-        ribbonCommand.addClass("who-is-streaming-ribbon-disabled");
-        await this.searchActiveFile();
+        ribbon.addClass("who-is-streaming-ribbon-disabled");
+
+        await this.searchActiveNote();
       } finally {
-        ribbonCommand.removeClass("who-is-streaming-ribbon-disabled");
+        ribbon.removeClass("who-is-streaming-ribbon-disabled");
       }
     });
-    this.addCommand({ id: "search", name: "Search", editorCallback: async (editor: Editor, view: MarkdownView) => {
-        await this.searchActiveFile();
-    }});
-    this.addCommand({ id: "refresh", name: "Refresh", editorCallback: async (editor: Editor, view: MarkdownView) => {
-        await this.refreshActiveFile();
-    }});
-    this.addCommand({ id: "bulk-refresh", name: "Bulk refresh", checkCallback: (checking: boolean) => {
-      const view = this.getActiveMoviesView();
-      if (!view) return false;
-
-      if (!checking) {
-        void this.refreshAllFiles(view);
-      }
-      return true;
-    }});
-
-    this.addCommand({ id: "bulk-refresh-jellyfin", name: "Bulk refresh Jellyfin", checkCallback: (checking: boolean) => {
-      if (this.getJellyfinInstances().length === 0) return false;
-
-      if (!checking) {
-        void this.syncJellyfinForAllFiles();
-      }
-      return true;
-    }});
-
-    this.addCommand({ id: "sync-jellyfin", name: "Sync Jellyfin", editorCheckCallback: (checking: boolean) => {
-      if (this.getJellyfinInstances().length === 0) return false;
-
-      if (!checking) {
-        void this.syncJellyfinActiveFile();
-      }
-      return true;
-    }});
   }
 
   onunload() {
     this.jellyfinApiService.clearCache();
   }
 
-  /**
-   * Jellyfin instances that are complete enough to query. Instances still being
-   * filled in from the settings tab are skipped.
-   */
-  getJellyfinInstances(): JellyfinInstance[] {
-    return this.settings.jellyfinInstances.filter(isJellyfinInstanceComplete);
-  }
-
-  registerMoviesView(view: MoviesBasesView): void {
-    this.moviesViews.add(view);
-  }
-
-  unregisterMoviesView(view: MoviesBasesView): void {
-    this.moviesViews.delete(view);
-  }
-
-  getActiveMoviesView(): MoviesBasesView | null {
-    const activeView = this.app.workspace.getActiveViewOfType(ItemView);
-    if (!activeView) return null;
-
-    for (const view of this.moviesViews) {
-      if (activeView.containerEl.contains(view.containerEl) && view.containerEl.isShown()) {
-        return view;
-      }
-    }
-
-    return null;
-  }
-
-  async searchActiveFile() {
-
-    if (!this.streamingAvailabilityApi.validateApiKey()) {
-      return;
-    }
-
-    let loadingNotice: Notice | undefined;
-
-    try {
-      const activeFile = this.app.workspace.getActiveFile();
-      if (!activeFile) {
-        new Notice("No active file");
-        return;
-      }
-
-      loadingNotice = new Notice(`🔍 Searching for "${activeFile.basename}"...`, 0);
-      const results = await this.streamingAvailabilityApi.searchForShowsByTitle(
-        activeFile.basename
-      );
-      loadingNotice?.hide();
-
-      if (results.length === 0) {
-        new Notice(`No shows found for "${activeFile.basename}"`, 5000);
-        return;
-      }
-
-      if (results.length === 1) {
-        await this.syncFileWithShow(activeFile, results[0]);
-        return;
-      }
-
-      new ShowSelectModal(this.app, results, (selectedShow: Show) => {
-        void this.syncFileWithShow(activeFile, selectedShow);
-      }).open();
-    } catch (error: unknown) {
-      loadingNotice?.hide();
-      new Notice("Sync failed. See developer console for details.", 5000);
-      console.error('Sync failed:', error);
-    }
-  }
-
-  async refreshActiveFile() {
-    if (!this.streamingAvailabilityApi.validateApiKey()) {
-      return;
-    }
-
-    const activeFile = this.app.workspace.getActiveFile();
-    if (!activeFile) {
-      new Notice("No active file");
-      return;
-    }
-
-    let loadingNotice: Notice | undefined;
-
-    try {
-      const [tmdb_id, showType] = await this.getTmdbId(activeFile);
-      if (!tmdb_id || !showType) {
-        new Notice("No TMDB ID or type found in frontmatter");
-        return;
-      }
-
-      loadingNotice = new Notice("🔄 Refreshing show by ID...", 0);
-      const show = await this.streamingAvailabilityApi.getShowByTmdbId(
-        showType,
-        tmdb_id,
-        false,
-        true
-      );
-
-      loadingNotice.hide();
-
-      if (!show) {
-        new Notice("Show not found", 5000);
-        return;
-      }
-
-      await this.syncFileWithShow(activeFile, show);
-    } catch (error: unknown) {
-      loadingNotice?.hide();
-      const errorMessage = await this.streamingAvailabilityApi.handleApiError(error, false);
-      new Notice(`${errorMessage || "Failed to refresh show"}`, 10000);
-      console.error('Refresh failed:', error);
-    }
-  }
-
-  async refreshAllFiles(view: MoviesBasesView) {
-    if (!this.streamingAvailabilityApi.validateApiKey()) {
-      return;
-    }
-
-    const files = this.getFilesToSync(view);
-    if (files.length === 0) {
-      return;
-    }
-
-    const filesToRefresh = this.orderForBulkRefresh(files);
-    if (filesToRefresh.length < files.length) {
-      new Notice(`Refreshing the ${filesToRefresh.length} least recently synced of ${files.length} notes`);
-    }
-
-    await this.runBulkOperation(filesToRefresh, "⚠️ Bulk refresh cancelled by user", async (file) => {
-      const [tmdb_id, showType] = await this.getTmdbId(file);
-      if (!tmdb_id || !showType) {
-        return "No TMDB id found";
-      }
-
-      const show = await this.streamingAvailabilityApi.getShowByTmdbId(showType, tmdb_id, false);
-      if (!show) {
-        return "Show not found";
-      }
-
-      await this.performSync(file, show, getEnabledSyncFields(this.settings));
-      return undefined;
-    });
-  }
-
-  async syncJellyfinForAllFiles() {
-    if (this.getJellyfinInstances().length === 0) {
-      new Notice("No Jellyfin instances configured");
-      return;
-    }
-
-    const files = this.getShowFiles();
-    if (files.length === 0) {
-      new Notice("No notes with a TMDB ID found");
-      return;
-    }
-
-    await this.runBulkOperation(files, "⚠️ Bulk Jellyfin refresh cancelled by user", async (file) => {
-      const [tmdb_id, showType] = await this.getTmdbId(file);
-      if (!tmdb_id || !showType) {
-        return "No TMDB id found";
-      }
-
-      await this.syncJellyfinFrontmatter(file, tmdb_id, showType);
-      return undefined;
-    });
-  }
-
-  async runBulkOperation(
-    files: TFile[],
-    cancellationNotice: string,
-    processFile: (file: TFile) => Promise<string | undefined>
-  ): Promise<void> {
-    const progressModal = new BulkSyncProgressModal(this.app, files.length);
-    progressModal.open();
-
-    for (const file of files) {
-      if (progressModal.isCancelled()) {
-        new Notice(cancellationNotice);
-        break;
-      }
-
-      progressModal.updateProgress(file.basename);
-
-      try {
-        const failure = await processFile(file);
-        if (failure) {
-          progressModal.recordFailure(file.basename, failure);
-        } else {
-          progressModal.recordSuccess();
-        }
-      } catch (error: unknown) {
-        progressModal.recordFailure(file.basename, await this.describeSyncError(error));
-      }
-    }
-
-    progressModal.complete();
-  }
-
-  async describeSyncError(error: unknown): Promise<string> {
-    const apiMessage = await this.streamingAvailabilityApi.handleApiError(error, false);
-    if (apiMessage) {
-      return apiMessage;
-    }
-
-    return error instanceof Error ? error.message : "Sync failed";
-  }
-
-  async syncJellyfinActiveFile() {
-    if (this.getJellyfinInstances().length === 0) {
-      new Notice("No Jellyfin instances configured");
-      return;
-    }
-
-    const activeFile = this.app.workspace.getActiveFile();
-    if (!activeFile) {
-      new Notice("No active file");
-      return;
-    }
-
-    try {
-      const [tmdb_id, showType] = await this.getTmdbId(activeFile);
-
-      if (!tmdb_id || !showType) {
-        new Notice("No TMDB ID found in frontmatter");
-        return;
-      }
-
-      new Notice("🔄 Syncing with Jellyfin...");
-
-      await this.syncJellyfinFrontmatter(activeFile, tmdb_id, showType);
-
-      new Notice("✅ Jellyfin sync complete");
-    } catch (error: unknown) {
-      new Notice("Failed to sync with Jellyfin");
-      console.error('Jellyfin sync failed:', error);
-    }
-  }
-
-  async syncJellyfinFrontmatter(file: TFile, tmdbId: number, showType: ShowType): Promise<void> {
-    const jellyfinAvailability = await this.jellyfinApiService.checkAvailability(
-      this.getJellyfinInstances(),
-      tmdbId,
-      showType === "movie" ? "movie" : "series"
-    );
-
-    await this.app.fileManager.processFrontMatter(file, (frontmatter) => {
-      if (!isRecord(frontmatter)) {
-        return;
-      }
-      buildJellyfinSyncFields(this.settings, jellyfinAvailability).forEach((field) => {
-        frontmatter[field.name] = field.value;
-      });
-    });
-  }
-
-  orderForBulkRefresh(files: TFile[]): TFile[] {
-    const ordered = [...files].sort((lv, rv) => this.getLastSyncedTime(lv) - this.getLastSyncedTime(rv));
-    const limit = this.settings.bulkRefreshLimit;
-
-    return limit > 0 ? ordered.slice(0, limit) : ordered;
-  }
-
-  private getLastSyncedTime(file: TFile): number {
-    const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter;
-    return parseLastSynced(frontmatter?.["Last Synced"]) ?? Number.MIN_SAFE_INTEGER;
-  }
-
-  getShowFiles(): TFile[] {
-    return this.app.vault.getMarkdownFiles().filter((file) =>
-      this.app.metadataCache.getFileCache(file)?.frontmatter?.["tmdb_id"] != null
-    );
-  }
-
-  getFilesToSync(view: MoviesBasesView): TFile[] {
-    const files = view.getDisplayedFiles();
-
-    if (files.length === 0) {
-      new Notice("No notes with a TMDB ID in this base");
-    }
-
-    return files;
-  }
-
-  async syncFileWithShow(file: TFile, selectedShow: Show, isBulkSync: boolean = false): Promise<void> {
-    const defaultEnabledFields = getEnabledSyncFields(this.settings);
-
-    if (!this.settings.showPreviewDialog) {
-      await this.performSync(file, selectedShow, defaultEnabledFields);
-      if (!isBulkSync) {
-        new Notice("✅ Successfully synced");
-      }
-      return;
-    }
-
-    const currentFrontmatter = await this.getCurrentFrontmatter(file);
-    const result = await new Promise<{ confirmed: boolean; enabledFields?: string[] }>((resolve) => {
-      new PreviewSyncModal(
-        this.app,
-        selectedShow,
-        this.settings,
-        currentFrontmatter,
-        file.basename,
-        (confirmed, enabledFields) => resolve({ confirmed, enabledFields })
-      ).open();
+  private registerViews(): void {
+    this.registerBasesView(TitlesViewType, {
+      name: "Titles",
+      icon: "film",
+      factory: (controller, scrollEl) => new TitlesBasesView(controller, scrollEl, this),
+      options: (config) => TitlesBasesView.getViewOptions(config),
     });
 
-    if (result.confirmed) {
-      await this.performSync(file, selectedShow, result.enabledFields);
-      if (!isBulkSync) {
-        new Notice("✅ Successfully synced");
-      }
-    }
-  }
-
-  async performSync(file: TFile, selectedShow: Show, enabledFields?: string[]): Promise<void> {
-    if (await this.shouldDownloadPoster(selectedShow, enabledFields)) {
-      await this.downloadPoster(selectedShow);
-    }
-
-    if (!enabledFields || enabledFields.includes("File Name")) {
-      await this.syncFilename(file, selectedShow);
-    }
-
-    const tmdbId = getTmdbId(selectedShow);
-    const jellyfinAvailability = await this.jellyfinApiService.checkAvailability(
-      this.getJellyfinInstances(),
-      parseInt(tmdbId),
-      selectedShow.showType === "movie" ? "movie" : "series"
-    );
-
-    await this.app.fileManager.processFrontMatter(file, (frontmatter) => {
-      if (isRecord(frontmatter)) {
-        this.syncFrontMatter(frontmatter, selectedShow, jellyfinAvailability, enabledFields);
-      }
-    });
-  }
-
-  async shouldDownloadPoster(show: Show, enabledFields?: string[]): Promise<boolean> {
-    if (this.settings.posterMode !== "local" || !show.imageSet?.verticalPoster?.w480) {
-      return false;
-    }
-
-    return !enabledFields || enabledFields.includes("Poster");
-  }
-
-  async getCurrentFrontmatter(file: TFile): Promise<Record<string, unknown>> {
-    let frontmatter: Record<string, unknown> = {};
-    await this.app.fileManager.processFrontMatter(file, (fm) => {
-      if (isRecord(fm)) {
-        frontmatter = { ...fm };
-      }
-    });
-    return frontmatter;
-  }
-
-  async syncFilename(file: TFile, show: Show): Promise<void> {
-    const template = show.showType === "movie"
-      ? this.settings.noteNameFormat
-      : this.settings.noteNameFormatSeries;
-
-    if (template.length === 0) return;
-
-    const newName = applyShowTemplate(template, show);
-
-    if (file.basename == newName) return;
-
-    const newPath = normalizePath(`${file.parent?.path}/${newName}.md`);
-    if (this.app.vault.getFileByPath(newPath) !== null) {
-      new Notice(`⚠️ File already exists: ${newName}.md`);
-      return;
-    }
-
-    await this.app.fileManager.renameFile(file, newPath);
-  }
-
-  syncFrontMatter(frontmatter: Record<string, unknown>, selectedShow: Show, jellyfinAvailability: JellyfinAvailability[] = [], enabledFields?: string[]) {
-    buildSyncFields(this.settings, selectedShow, jellyfinAvailability).forEach((field) => {
-      if (field.alwaysSync || isSyncFieldEnabled(this.settings, field.enabledBy || field.name, enabledFields)) {
-        frontmatter[field.name] = field.value;
-      }
-    });
-  }
-
-  async getTmdbId(activeFile: TFile): Promise<[number | undefined, ShowType | undefined]> {
-    let tmdb_id: number | undefined = undefined;
-    let showType: ShowType | undefined = undefined;
-
-    await this.app.fileManager.processFrontMatter(activeFile, (frontmatter) => {
-      if (!isRecord(frontmatter)) {
-        return;
-      }
-
-      const tmdbIdValue = frontmatter["tmdb_id"];
-      if (typeof tmdbIdValue === "number") {
-        tmdb_id = tmdbIdValue;
-      }
-      const typeValue = frontmatter["Type"];
-      if (typeValue === "movie" || typeValue === "series") {
-        showType = typeValue;
-      }
+    this.registerBasesView(CastGraphViewType, {
+      name: "Cast graph",
+      icon: "waypoints",
+      factory: (controller, scrollEl) => new CastGraphBasesView(controller, scrollEl),
+      options: CastGraphBasesView.getViewOptions,
     });
 
-    return [tmdb_id, showType];
-  }
+    this.registerBasesView(StatsViewType, {
+      name: "Title stats",
+      icon: "chart-column",
+      factory: (controller, scrollEl) => new StatsBasesView(controller, scrollEl, this),
+      options: StatsBasesView.getViewOptions,
+    });
 
-  async downloadPoster(show: Show): Promise<void> {
-    if (!show.imageSet?.verticalPoster?.w480) {
-      return;
-    }
-
-    try {
-      const folderPath = normalizePath(this.settings.posterFolder);
-      if (!await this.app.vault.adapter.exists(folderPath)) {
-        await this.app.vault.createFolder(folderPath);
-      }
-
-      const tmdbId = show.tmdbId.split('/').pop() || show.tmdbId;
-      const posterFilename = `${tmdbId}.jpg`;
-      const posterPath = normalizePath(`${folderPath}/${posterFilename}`);
-
-      if (await this.app.vault.adapter.exists(posterPath)) {
-        return;
-      }
-
-      const response = await requestUrl({
-        url: show.imageSet.verticalPoster.w480,
-        method: "GET",
-      });
-
-      await this.app.vault.adapter.writeBinary(posterPath, response.arrayBuffer);
-    } catch (error: unknown) {
-      // Poster downloads are optional; keep the sync result.
-      console.debug('Poster download failed:', error);
-    }
+    this.registerBasesView(DiscoverViewType, {
+      name: "Streaming discover",
+      icon: "telescope",
+      factory: (controller, scrollEl) => new DiscoverBasesView(controller, scrollEl, this),
+      options: (config) => DiscoverBasesView.getViewOptions(config, this.settings),
+    });
   }
 
   setupApiClient() {
@@ -522,14 +109,387 @@ export default class WhoIsStreamingPlugin extends Plugin {
 
   async loadSettings() {
     const loadedData: unknown = await this.loadData();
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, isRecord(loadedData) ? loadedData : {});
+    const loaded = isRecord(loadedData) ? loadedData : {};
+
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, loaded);
+
+    this.settings.fieldSources = { ...DEFAULT_FIELD_SOURCES, ...(isRecord(loaded["fieldSources"]) ? loaded["fieldSources"] : {}) };
+
+    const services = Object.values(this.settings.streamingServicesToSync ?? {})
+      .filter((service) => isRecord(service) && typeof service.id === "string");
+
+    this.settings.streamingServicesToSync = Object.fromEntries(services.map((service) => [service.id, service]));
   }
 
   async saveSettings() {
     await this.saveData(this.settings);
   }
-}
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
+  getJellyfinInstances(): JellyfinInstance[] {
+    return this.settings.jellyfinInstances.filter(isJellyfinInstanceComplete);
+  }
+
+  registerTitlesView(view: TitlesBasesView): void {
+    this.titlesViews.add(view);
+  }
+
+  unregisterTitlesView(view: TitlesBasesView): void {
+    this.titlesViews.delete(view);
+  }
+
+  registerStatsView(view: StatsBasesView): void {
+    this.statsViews.add(view);
+  }
+
+  unregisterStatsView(view: StatsBasesView): void {
+    this.statsViews.delete(view);
+  }
+
+  private getActiveTitlesView(): TitlesBasesView | null {
+    return this.findActiveView(this.titlesViews);
+  }
+
+  getActiveTitleListView(): TitleListView | null {
+    return this.getActiveTitlesView() ?? this.findActiveView(this.statsViews);
+  }
+
+  private findActiveView<T extends { containerEl: HTMLElement }>(views: Set<T>): T | null {
+    const activeView = this.app.workspace.getActiveViewOfType(ItemView);
+
+    if (!activeView) return null;
+
+    for (const view of views) {
+      if (activeView.containerEl.contains(view.containerEl) && view.containerEl.isShown()) return view;
+    }
+
+    return null;
+  }
+
+  async getGenres(): Promise<{ id: string; name: string }[]> {
+    const fetchedBefore = this.settings.genresCacheAsOf;
+    const genres = await this.streamingAvailabilityApi.getGenres();
+
+    if (this.settings.genresCacheAsOf !== fetchedBefore) {
+      await this.saveSettings();
+    }
+
+    return genres;
+  }
+
+  async checkLeavingSoon(): Promise<void> {
+    const loadingNotice = new Notice("Checking what's leaving soon…", 0);
+
+    try {
+      const summary = await updateLeavingSoon(this.app, this.streamingAvailabilityApi);
+
+      loadingNotice.hide();
+      if (!summary) return;
+
+      if (summary.leaving.length === 0) {
+        const cleared = summary.cleared > 0 ? ` Cleared ${summary.cleared} that are no longer leaving.` : "";
+
+        new Notice(`Nothing in your vault is leaving your services soon.${cleared}`, 8000);
+
+        return;
+      }
+
+      const lines = summary.leaving.slice(0, 5).map((title) =>
+        `${title.file.basename}: ${title.services.join(", ")}, ${title.date ?? "soon"}`
+      );
+
+      if (summary.leaving.length > 5) lines.push(`…and ${summary.leaving.length - 5} more`);
+      const partial = summary.complete ? "" : "\nOnly the soonest departures were checked.";
+
+      new Notice(`${summary.leaving.length} in your vault leaving soon:\n${lines.join("\n")}${partial}`, 15000);
+    } catch (error: unknown) {
+      loadingNotice.hide();
+      new Notice(`❌ Could not check what's leaving: ${await this.describeApiError(error)}`, 10000);
+      console.error("Leaving soon check failed:", error);
+    }
+  }
+
+  async createNoteForTitle(show: Show): Promise<TFile | undefined> {
+    try {
+      const { type } = showTitleId(show);
+      const file = await createTitleNote(this.app, this.settings, {
+        title: show.title,
+        type,
+        year: show.releaseYear ?? show.firstAirYear,
+        folder: guessImportFolder(this.app),
+        variables: getShowTemplateVariables(show),
+        write: [],
+      });
+      const warning = await this.refreshNote(file, show);
+
+      new Notice(warning ? `Added ${file.basename}. ${warning}` : `Added ${file.basename}`, warning ? 10000 : undefined);
+
+      return file;
+    } catch (error: unknown) {
+      new Notice(`❌ Could not add "${show.title}": ${describeError(error)}`, 10000);
+      console.error("Adding a note from Streaming discover failed:", error);
+
+      return undefined;
+    }
+  }
+
+  async searchActiveNote(): Promise<void> {
+    if (!this.streamingAvailabilityApi.validateApiKey()) return;
+
+    const file = this.app.workspace.getActiveFile();
+
+    if (!file) {
+      new Notice("No active note");
+
+      return;
+    }
+
+    const loadingNotice = new Notice(`🔍 Searching for "${file.basename}"…`, 0);
+
+    try {
+      const results = await this.streamingAvailabilityApi.searchForShowsByTitle(file.basename);
+
+      loadingNotice.hide();
+
+      if (results.length === 0) {
+        new Notice(`No titles found for "${file.basename}"`, 5000);
+      } else if (results.length === 1) {
+        await this.identifyNote(file, results[0]);
+      } else {
+        new TitleSelectModal(this.app, results, (selected: Show) => void this.identifyNote(file, selected)).open();
+      }
+    } catch (error: unknown) {
+      loadingNotice.hide();
+      new Notice(`❌ Search failed: ${await this.describeApiError(error)}`, 10000);
+      console.error("Search failed:", error);
+    }
+  }
+
+  async refreshActiveNote(): Promise<void> {
+    if (!this.streamingAvailabilityApi.validateApiKey()) return;
+
+    const file = this.app.workspace.getActiveFile();
+
+    if (!file) {
+      new Notice("No active note");
+
+      return;
+    }
+
+    const reporter = new RefreshReporter("Streaming Availability");
+    const id = readTitleId(this.app, file);
+
+    if (!id) {
+      reporter.done(failed("This note has no TMDB ID or type"));
+
+      return;
+    }
+
+    try {
+      const show = await this.streamingAvailabilityApi.getShowByTmdbId(id.type, id.tmdbId, false, true);
+
+      if (!show) reporter.done(failed("Title not found"));
+      else await this.refreshWithPreview(file, show, reporter);
+    } catch (error: unknown) {
+      reporter.fail(error, await this.describeApiError(error));
+    }
+  }
+
+  getBulkTargets(): { files: TFile[]; scope: string } {
+    const view = this.getActiveTitleListView();
+
+    return { files: view ? view.getDisplayedFiles() : getVaultTitles(this.app).map((title) => title.file), scope: view ? "this base" : "your vault" };
+  }
+
+  async bulkRefresh(): Promise<void> {
+    if (!this.streamingAvailabilityApi.validateApiKey()) return;
+
+    const { files: candidates, scope } = this.getBulkTargets();
+    const files = candidates.filter((file) => readTitleId(this.app, file) !== undefined);
+
+    if (files.length === 0) {
+      new Notice(`No titles with a TMDB ID found in ${scope}`);
+
+      return;
+    }
+
+    const lastSynced = (file: TFile) => parseLastSynced(getFrontmatter(this.app, file)[LAST_SYNCED_PROPERTY]) ?? Number.MIN_SAFE_INTEGER;
+    const ordered = [...files].sort((a, b) => lastSynced(a) - lastSynced(b));
+    const toRefresh = this.settings.bulkRefreshLimit > 0 ? ordered.slice(0, this.settings.bulkRefreshLimit) : ordered;
+
+    if (toRefresh.length < files.length) {
+      new Notice(`Refreshing the ${toRefresh.length} least recently refreshed of ${files.length} notes`);
+    }
+
+    await this.runStreamingBulk(toRefresh, "Bulk refresh", async (file) => {
+      const id = readTitleId(this.app, file);
+
+      if (!id) return failed("No TMDB ID or type");
+
+      return this.refreshById(file, id.type, id.tmdbId);
+    });
+  }
+
+  getImportedNotesToRefresh(): TFile[] {
+    return getVaultTitles(this.app)
+      .filter((title) => title.frontmatter[TMDB_ID_PROPERTY] == null
+        || (typeof title.frontmatter[LETTERBOXD_PROPERTY] === "string" && title.frontmatter[LAST_SYNCED_PROPERTY] == null))
+      .map((title) => title.file);
+  }
+
+  async refreshImportedNotes(): Promise<void> {
+    if (!this.streamingAvailabilityApi.validateApiKey()) return;
+
+    const imported = this.getImportedNotesToRefresh();
+    const limit = this.settings.bulkRefreshLimit;
+    const files = limit > 0 ? imported.slice(0, limit) : imported;
+
+    if (files.length < imported.length) {
+      new Notice(`Refreshing ${files.length} of ${imported.length} imported notes. Run again for the rest.`);
+    }
+
+    await this.runStreamingBulk(files, "Refresh imported notes", async (file) => {
+      const frontmatter = getFrontmatter(this.app, file);
+      const title = getNoteTitle(file, frontmatter);
+      const year = getNoteYear(file, frontmatter);
+
+      const stored = frontmatter[TMDB_ID_PROPERTY];
+      const tmdbId = typeof stored === "number" ? stored
+        : this.tmdbApi.isConfigured() ? await this.tmdbApi.findMovieId(title, year) : undefined;
+
+      if (tmdbId !== undefined) {
+        const outcome = await this.refreshById(file, "movie", tmdbId);
+
+        if (outcome.status !== "failed" || typeof stored === "number") return outcome;
+      }
+
+      const wanted = normaliseTitle(title);
+      const matches = (await this.streamingAvailabilityApi.searchForShowsByTitle(title)).filter((show) =>
+        show.showType === "movie"
+        && normaliseTitle(show.title) === wanted
+        && (year === undefined || show.releaseYear === year)
+      );
+
+      if (matches.length === 0) return failed("No exact match found");
+      if (matches.length > 1) return failed(`${matches.length} possible matches; use Search on this note`);
+
+      return warned(await this.refreshNote(file, matches[0]));
+    });
+  }
+
+  private async refreshById(file: TFile, type: TitleType, tmdbId: number): Promise<Outcome> {
+    const show = await this.streamingAvailabilityApi.getShowByTmdbId(type, tmdbId, false);
+
+    if (!show) return failed("Title not found");
+
+    return warned(await this.refreshNote(file, show));
+  }
+
+  private runStreamingBulk(files: TFile[], title: string, processFile: (file: TFile) => Promise<Outcome>): Promise<void> {
+    return runBulkOperation(this.app, files, title, processFile, (error) => this.describeApiError(error));
+  }
+
+  private async describeApiError(error: unknown): Promise<string> {
+    const apiMessage = await this.streamingAvailabilityApi.handleApiError(error, false);
+
+    return apiMessage || describeError(error);
+  }
+
+  private async identifyNote(file: TFile, show: Show): Promise<void> {
+    const reporter = new RefreshReporter("Streaming Availability");
+
+    try {
+      if (!await this.refreshWithPreview(file, show, reporter)) return;
+      const current = this.app.vault.getFileByPath(file.path) ?? file;
+
+      await applyNoteTemplate(this.app, this.settings, current, { ...getShowTemplateVariables(show), ...propertyVariables(getFrontmatter(this.app, current)) });
+    } catch (error: unknown) {
+      reporter.fail(error, await this.describeApiError(error));
+    }
+  }
+
+  private async refreshWithPreview(file: TFile, show: Show, reporter: RefreshReporter): Promise<boolean> {
+    const plan = await this.planRefresh(file, show);
+    let accepted: Set<string> | undefined;
+
+    if (this.settings.showPreviewDialog) {
+      reporter.pause();
+      accepted = await previewPlan(this.app, getFrontmatter(this.app, file), file.basename, plan);
+
+      if (!accepted) {
+        reporter.cancel();
+
+        return false;
+      }
+    }
+
+    reporter.done(warned(await applyPlan(this.app, file, plan, accepted)));
+
+    return true;
+  }
+
+  async refreshNote(file: TFile, show: Show): Promise<string | undefined> {
+    return applyPlan(this.app, file, await this.planRefresh(file, show));
+  }
+
+  private async planRefresh(file: TFile, show: Show): Promise<RefreshPlan> {
+    const { tmdbId, type } = showTitleId(show);
+    const enabledFields = getEnabledFields(this.settings);
+    const jellyfinAvailability = await this.jellyfinApiService.checkAvailability(this.getJellyfinInstances(), tmdbId, type);
+    const template = this.getNameTemplate(show);
+    const posterUrl = show.imageSet?.verticalPoster?.w480;
+    const plan: RefreshPlan = {
+      heading: show.title,
+      details: `${type === "movie" ? "Movie" : "Series"} • ${show.releaseYear ?? show.firstAirYear ?? ""}`,
+      posterUrl: show.imageSet?.verticalPoster?.w240,
+      newName: enabledFields.includes(NOTE_NAME_FIELD) && template.length > 0 ? await renderFileName(template, getShowTemplateVariables(show)) : undefined,
+      writers: [(frontmatter) => {
+        this.writeFields(frontmatter, show, jellyfinAvailability, enabledFields);
+        applyLeavingFromShow(frontmatter, this.settings, show);
+        applyJellyfinWatchHistory(frontmatter, jellyfinAvailability, this.settings);
+        applyJellyfinRuntime(frontmatter, jellyfinAvailability, this.settings);
+      }],
+      posterDownload: this.settings.posterMode === "local" && posterUrl && enabledFields.includes(POSTER_PROPERTY)
+        ? () => downloadPoster(this.app, this.settings, tmdbId, posterUrl)
+        : undefined,
+    };
+
+    if (!this.tmdbNotes.isConfigured() || getFieldsFrom(this.settings, "tmdb").length === 0) return plan;
+
+    try {
+      const tmdb = await this.tmdbNotes.plan(file, { type, tmdbId });
+
+      return "plan" in tmdb ? combinePlans(plan, tmdb.plan) : { ...plan, warning: `TMDB fields not refreshed: ${tmdb.failure}` };
+    } catch (error: unknown) {
+      console.error(`TMDB refresh failed for ${file.path}:`, error);
+
+      return { ...plan, warning: "TMDB fields not refreshed" };
+    }
+  }
+
+  private writeFields(frontmatter: Record<string, unknown>, show: Show, jellyfinAvailability: JellyfinAvailability[], enabledFields: string[]): void {
+    for (const field of buildRefreshFields(this.settings, show, jellyfinAvailability)) {
+      const existing = frontmatter[field.name];
+
+      if (field.name === WATCHED_PROPERTY && existing !== undefined && typeof existing !== "boolean") continue;
+
+      if (field.always || isRefreshFieldEnabled(this.settings, field.enabledBy || field.name, enabledFields)) {
+        frontmatter[field.name] = field.value;
+      }
+    }
+  }
+
+  private getNameTemplate(show: Show): string {
+    return show.showType === "movie" ? this.settings.noteNameFormat : this.settings.noteNameFormatSeries;
+  }
+
+  async markWatchedToday(file: TFile): Promise<void> {
+    const today = toDayString(new Date());
+    let added = false;
+
+    await this.app.fileManager.processFrontMatter(file, (frontmatter) => {
+      if (isRecord(frontmatter)) added = addWatchDates(frontmatter, [today]);
+    });
+
+    new Notice(added ? `Marked as watched on ${today}` : `Already marked as watched on ${today}`);
+  }
 }
